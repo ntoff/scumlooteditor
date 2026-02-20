@@ -24,6 +24,7 @@ class SpawnerEditor(QWidget):
         self._loading_data = False
         self._last_used_folder = ""
         self._parameters_data = []
+        self._suppress_rarity_change = False  # Prevent spurious updates
 
         self.init_ui()
         self.load_settings()
@@ -100,11 +101,13 @@ class SpawnerEditor(QWidget):
         self.top_splitter = QSplitter(Qt.Horizontal)
 
         self.nodes_tree = QTreeWidget()
-        self.nodes_tree.setHeaderLabels(["Rarity"])
-        self.nodes_tree.header().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.nodes_tree.setHeaderLabels(["Rarity", "IDs"])
+        # Allow both columns to be resized interactively by the user
+        self.nodes_tree.header().setSectionResizeMode(QtWidgets.QHeaderView.Interactive)
         self.nodes_tree.itemSelectionChanged.connect(self.on_node_selection_changed)
         self.nodes_tree.setMinimumWidth(200)
         self.nodes_tree.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Expanding)
+        self.nodes_tree.setSelectionMode(QTreeWidget.ExtendedSelection)
 
         self.nodes_tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self.nodes_tree.customContextMenuRequested.connect(self.show_tree_context_menu)
@@ -121,6 +124,9 @@ class SpawnerEditor(QWidget):
         self.ids_list_widget = QListWidget()
         ids_layout.addWidget(self.ids_label)
         ids_layout.addWidget(self.ids_list_widget)
+
+        # Connect itemChanged signal to update tree when IDs change in list
+        self.ids_list_widget.itemChanged.connect(self.on_ids_list_item_changed)
 
         self.ids_list_widget.setContextMenuPolicy(Qt.CustomContextMenu)
         self.ids_list_widget.customContextMenuRequested.connect(self.show_ids_context_menu)
@@ -373,6 +379,7 @@ class SpawnerEditor(QWidget):
                 self.update_nodes_ui()
                 self.update_post_spawn_actions_ui()
 
+                # Auto-select first item for initial view
                 root = self.nodes_tree.invisibleRootItem()
                 items_child = root.child(0) if root.childCount() > 0 else None
                 if items_child and items_child.childCount() > 0:
@@ -442,13 +449,16 @@ class SpawnerEditor(QWidget):
 
         for item in items_list:
             rarity = item.get("Rarity", "Common")
-            tree_item = QTreeWidgetItem([rarity])
+            item_id = item.get("Id", "")
+            tree_item = QTreeWidgetItem([rarity, item_id])
             tree_item.setData(0, Qt.UserRole, ("Item", items_list.index(item)))
             items_parent.addChild(tree_item)
 
         for node in nodes_list:
             rarity = node.get("Rarity", "Common")
-            tree_item = QTreeWidgetItem([rarity])
+            ids = node.get("Ids", [])
+            ids_str = ", ".join(ids) if ids else ""
+            tree_item = QTreeWidgetItem([rarity, ids_str])
             tree_item.setData(0, Qt.UserRole, ("Node", nodes_list.index(node)))
             nodes_parent.addChild(tree_item)
 
@@ -618,13 +628,22 @@ class SpawnerEditor(QWidget):
         selected_items = self.nodes_tree.selectedItems()
         if not selected_items:
             self.ids_list_widget.clear()
+            self.rarity_combo.blockSignals(True)
             self.rarity_combo.clear()
             self.rarity_combo.addItems(self.get_rarity_list())
+            self.rarity_combo.setCurrentIndex(-1)  # No selection
+            self.rarity_combo.blockSignals(False)
             return
 
         tree_item = selected_items[0]
         data = tree_item.data(0, Qt.UserRole)
         if not data:
+            self.ids_list_widget.clear()
+            self.rarity_combo.blockSignals(True)
+            self.rarity_combo.clear()
+            self.rarity_combo.addItems(self.get_rarity_list())
+            self.rarity_combo.setCurrentIndex(-1)
+            self.rarity_combo.blockSignals(False)
             return
 
         node_type, index = data
@@ -636,10 +655,17 @@ class SpawnerEditor(QWidget):
             node_list = self.current_data.get("Nodes", [])
 
         if index >= len(node_list):
+            self.ids_list_widget.clear()
+            self.rarity_combo.blockSignals(True)
+            self.rarity_combo.clear()
+            self.rarity_combo.addItems(self.get_rarity_list())
+            self.rarity_combo.setCurrentIndex(-1)
+            self.rarity_combo.blockSignals(False)
             return
 
         node = node_list[index]
 
+        # Update IDs list
         self.ids_list_widget.clear()
         if node_type == "Item":
             id_single = node.get("Id", "")
@@ -650,7 +676,9 @@ class SpawnerEditor(QWidget):
             for id_str in ids:
                 self.ids_list_widget.addItem(id_str)
 
+        # Update rarity combo to show current value (but do NOT trigger change)
         rarity = node.get("Rarity", "Common")
+        self.rarity_combo.blockSignals(True)
         self.rarity_combo.clear()
         self.rarity_combo.addItems(self.get_rarity_list())
         index_ = self.rarity_combo.findText(rarity)
@@ -658,6 +686,7 @@ class SpawnerEditor(QWidget):
             self.rarity_combo.setCurrentIndex(index_)
         else:
             self.rarity_combo.setCurrentText(rarity)
+        self.rarity_combo.blockSignals(False)
 
         self.update_post_spawn_actions_ui()
 
@@ -698,8 +727,42 @@ class SpawnerEditor(QWidget):
 
             if node_type == "Item" and len(new_ids) > 0:
                 node["Id"] = new_ids[0]
+                # Update tree item's second column
+                tree_item.setText(1, new_ids[0])
             elif node_type == "Node":
                 node["Ids"] = new_ids
+                # Update tree item's second column with comma-separated IDs
+                ids_str = ", ".join(new_ids) if new_ids else ""
+                tree_item.setText(1, ids_str)
+
+    def on_ids_list_item_changed(self, item):
+        """Update the tree when an item in the IDs list is changed"""
+        selected_items = self.nodes_tree.selectedItems()
+        if not selected_items or not self.current_data:
+            return
+
+        tree_item = selected_items[0]
+        data = tree_item.data(0, Qt.UserRole)
+        if not data:
+            return
+
+        node_type, index = data
+        node_list = []
+        if node_type == "Item":
+            node_list = self.current_data.get("Items", [])
+        elif node_type == "Node":
+            node_list = self.current_data.get("Nodes", [])
+
+        if index < len(node_list):
+            new_ids = [self.ids_list_widget.item(i).text() for i in range(self.ids_list_widget.count())]
+
+            if node_type == "Item" and len(new_ids) > 0:
+                node_list[index]["Id"] = new_ids[0]
+                tree_item.setText(1, new_ids[0])
+            elif node_type == "Node":
+                node_list[index]["Ids"] = new_ids
+                ids_str = ", ".join(new_ids) if new_ids else ""
+                tree_item.setText(1, ids_str)
 
     def on_property_changed(self, value=None):
         if not self.current_data or getattr(self, '_loading_data', False):
@@ -743,26 +806,81 @@ class SpawnerEditor(QWidget):
         self.current_data["PostSpawnActions"] = root_post_spawn_actions
 
     def on_rarity_changed(self, index):
+        # Skip if suppression flag is set or no data
+        if self._suppress_rarity_change or not self.current_data:
+            return
+
+        # Only proceed if at least one item is selected
         selected_items = self.nodes_tree.selectedItems()
         if not selected_items:
             return
 
-        tree_item = selected_items[0]
-        data = tree_item.data(0, Qt.UserRole)
-        if not data:
+        new_rarity = self.rarity_combo.currentText()
+        if not new_rarity:
             return
 
-        node_type, idx = data
-        node_list = []
-        if node_type == "Item":
-            node_list = self.current_data.get("Items", [])
-        elif node_type == "Node":
-            node_list = self.current_data.get("Nodes", [])
+        # Collect unique (node_type, index) to avoid duplicate updates
+        processed = set()
 
-        if idx < len(node_list):
-            new_rarity = self.rarity_combo.currentText()
-            node_list[idx]["Rarity"] = new_rarity
-            tree_item.setText(0, new_rarity)
+        for tree_item in selected_items:
+            data = tree_item.data(0, Qt.UserRole)
+            if not data:
+                continue
+
+            node_type, idx = data
+            key = (node_type, idx)
+            if key in processed:
+                continue
+            processed.add(key)
+
+            # Get the correct node list
+            node_list = []
+            if node_type == "Item":
+                node_list = self.current_data.get("Items", [])
+            elif node_type == "Node":
+                node_list = self.current_data.get("Nodes", [])
+            else:
+                continue
+
+            if idx < len(node_list):
+                node_list[idx]["Rarity"] = new_rarity
+                tree_item.setText(0, new_rarity)
+
+    def change_rarity_for_selected(self):
+        selected_items = self.nodes_tree.selectedItems()
+        if not selected_items:
+            return
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Change Rarity for Selected")
+        layout = QVBoxLayout(dialog)
+
+        layout.addWidget(QLabel("New Rarity:"))
+        rarity_combo = QComboBox()
+        rarity_combo.addItems(self.get_rarity_list())
+        layout.addWidget(rarity_combo)
+
+        btn_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btn_box.accepted.connect(dialog.accept)
+        btn_box.rejected.connect(dialog.reject)
+        layout.addWidget(btn_box)
+
+        if dialog.exec_() == QDialog.Accepted:
+            new_rarity = rarity_combo.currentText()
+            for tree_item in selected_items:
+                data = tree_item.data(0, Qt.UserRole)
+                if not data:
+                    continue
+                node_type, idx = data
+                node_list = []
+                if node_type == "Item":
+                    node_list = self.current_data.get("Items", [])
+                elif node_type == "Node":
+                    node_list = self.current_data.get("Nodes", [])
+
+                if idx < len(node_list):
+                    node_list[idx]["Rarity"] = new_rarity
+                    tree_item.setText(0, new_rarity)
 
     def closeEvent(self, event):
         self.save_settings()
