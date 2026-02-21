@@ -1,14 +1,15 @@
 # tabs/node_tree.py
 import json
+import sys
 import os
 from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtWidgets import (
     QWidget, QTreeView, QVBoxLayout, QHBoxLayout, QFrame, QPushButton,
     QFileDialog, QMessageBox, QFormLayout, QDialog, QDialogButtonBox,
     QLineEdit, QCompleter, QListView, QStyledItemDelegate, QComboBox,
-    QMenu, QAction, QAbstractItemView, QSplitter
+    QMenu, QAction, QAbstractItemView, QSplitter, QLabel
 )
-from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QByteArray
+from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QByteArray, QSize
 
 
 class CompleterDelegate(QStyledItemDelegate):
@@ -417,7 +418,8 @@ class NodeTreeViewer(QWidget):
         name_edit.setPlaceholderText("Enter name...")
         name_completer = QCompleter(parameters)
         name_completer.setCaseSensitivity(Qt.CaseInsensitive)
-        name_completer.setCompletionMode(QCompleter.UnfilteredPopupCompletion)
+        name_completer.setCompletionMode(QCompleter.PopupCompletion)
+        name_completer.setFilterMode(Qt.MatchContains)
         name_edit.setCompleter(name_completer)
 
         name_popup = QListView()
@@ -431,23 +433,13 @@ class NodeTreeViewer(QWidget):
 
         layout.addRow("Name:", name_edit)
 
-        rarity_edit = QLineEdit(dialog)
-        rarity_edit.setPlaceholderText("Enter rarity...")
-        rarity_completer = QCompleter(self.RARITIES)
-        rarity_completer.setCaseSensitivity(Qt.CaseInsensitive)
-        rarity_completer.setCompletionMode(QCompleter.UnfilteredPopupCompletion)
-        rarity_edit.setCompleter(rarity_completer)
+        # ✅ Replace rarity QLineEdit with QComboBox
+        rarity_combo = QComboBox()
+        rarity_combo.addItems(self.RARITIES)
+        # Optional: pre-select "Common" for convenience
+        rarity_combo.setCurrentIndex(self.RARITIES.index("Common") if "Common" in self.RARITIES else 0)
 
-        rarity_popup = QListView()
-        rarity_popup.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        rarity_popup.setWordWrap(False)
-        rarity_popup.setMinimumWidth(300)
-        rarity_completer.setPopup(rarity_popup)
-
-        rarity_delegate = CompleterDelegate()
-        rarity_popup.setItemDelegate(rarity_delegate)
-
-        layout.addRow("Rarity:", rarity_edit)
+        layout.addRow("Rarity:", rarity_combo)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
@@ -458,14 +450,14 @@ class NodeTreeViewer(QWidget):
 
         if dialog.exec_() == QDialog.Accepted:
             name = name_edit.text().strip()
-            rarity = rarity_edit.text().strip()
+            rarity = rarity_combo.currentText()  # ← now gets selected value
 
             if not name:
                 QMessageBox.warning(self, "Invalid Input", "Name cannot be empty!")
                 return
 
             child_data = {"Name": name}
-            if rarity:
+            if rarity and rarity in self.RARITIES:  # ensure validity
                 child_data["Rarity"] = rarity
 
             child_item = TreeItem(child_data, parent_item)
@@ -603,7 +595,9 @@ class NodeTreeViewer(QWidget):
     def _load_parameters(self):
         parameters = []
         try:
-            with open("parameters.json", 'r') as f:
+            main_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+            params_path = os.path.join(main_dir, "parameters.json")
+            with open(params_path, 'r') as f:
                 data = json.load(f)
                 parameters = [param["Id"] for param in data.get("Parameters", [])]
         except Exception as e:

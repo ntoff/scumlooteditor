@@ -1,5 +1,6 @@
 # tabs/spawner.py
 import json
+import sys
 import os
 from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtWidgets import (
@@ -7,9 +8,19 @@ from PyQt5.QtWidgets import (
     QTreeWidget, QTreeWidgetItem, QListWidget, QListWidgetItem, QComboBox,
     QGroupBox, QFormLayout, QSpinBox, QCheckBox, QScrollArea, QDialog,
     QDialogButtonBox, QLineEdit, QCompleter, QMenu, QAction, QHBoxLayout,
-    QLabel
+    QLabel, QListView
 )
 from PyQt5.QtCore import Qt, QStringListModel
+
+
+class CompleterDelegate(QtWidgets.QStyledItemDelegate):
+    def sizeHint(self, option, index):
+        size = super().sizeHint(option, index)
+        text = index.data(Qt.DisplayRole)
+        font_metrics = option.widget.fontMetrics() if hasattr(option, 'widget') and option.widget else QtGui.QFontMetrics(QtGui.QFont())
+        width = font_metrics.boundingRect(text).width()
+        return QtCore.QSize(width, size.height())
+
 
 from settings import SettingsManager
 
@@ -26,6 +37,7 @@ class SpawnerEditor(QWidget):
         self._parameters_data = []
         self._suppress_rarity_change = False  # Prevent spurious updates
 
+        self.load_parameters_data()
         self.init_ui()
         self.load_settings()
 
@@ -45,13 +57,47 @@ class SpawnerEditor(QWidget):
         else:
             self.top_splitter.setSizes([300, 700])
 
+        # Restore column widths for tree (Rarity and IDs)
+        column_widths = settings.get("column_widths", [])
+        if column_widths and len(column_widths) == 2:
+            self.nodes_tree.header().resizeSection(0, column_widths[0])
+            self.nodes_tree.header().resizeSection(1, column_widths[1])
+
     def save_settings(self):
+        column_widths = []
+        header = self.nodes_tree.header()
+        for i in range(header.count()):
+            column_widths.append(header.sectionSize(i))
+
         settings = {
             "last_folder": getattr(self, '_last_used_folder', ""),
             "splitter_sizes": self.main_splitter.sizes(),
-            "top_splitter_sizes": self.top_splitter.sizes()
+            "top_splitter_sizes": self.top_splitter.sizes(),
+            "column_widths": column_widths
         }
         self.settings_manager.save_settings('spawner_editor', settings)
+
+    def load_parameters_data(self):
+        """Load parameters.json from the main executable directory."""
+        try:
+            # Get the main app directory (not the tabs/ subdirectory)
+            main_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+            params_path = os.path.join(main_dir, "parameters.json")
+        except Exception:
+            # Fallback: try current working directory (for dev without argv[0])
+            params_path = os.path.join(os.getcwd(), "parameters.json")
+
+        if os.path.exists(params_path):
+            try:
+                with open(params_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    self._parameters_data = [param["Id"] for param in data.get("Parameters", [])]
+            except Exception as e:
+                print(f"Error loading parameters.json: {e}")
+                self._parameters_data = []
+        else:
+            print(f"⚠️ parameters.json not found at: {params_path}")
+            self._parameters_data = []
 
     def init_ui(self):
         main_layout = QVBoxLayout(self)
@@ -235,11 +281,25 @@ class SpawnerEditor(QWidget):
         layout.addWidget(QLabel("Enter ID:"))
 
         id_input = QLineEdit()
+
+        # 🔁 Proper completer setup (like node_tree.py)
         if self._parameters_data:
             model = QStringListModel(self._parameters_data)
             completer = QCompleter(model, id_input)
-            completer.setFilterMode(Qt.MatchContains)
             completer.setCaseSensitivity(Qt.CaseInsensitive)
+            completer.setCompletionMode(QCompleter.PopupCompletion)
+            completer.setFilterMode(Qt.MatchContains)
+
+            # Popup customization
+            popup = QListView()
+            popup.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            popup.setWordWrap(False)
+            popup.setMinimumWidth(300)
+            completer.setPopup(popup)
+
+            delegate = CompleterDelegate()
+            popup.setItemDelegate(delegate)
+
             id_input.setCompleter(completer)
 
         layout.addWidget(id_input)
@@ -280,59 +340,59 @@ class SpawnerEditor(QWidget):
         self.general_layout.setSpacing(6)
 
         self.file_path_label = QLabel("None")
-        
+
         self.probability_spin = QSpinBox()
         self.probability_spin.setRange(-1, 100)
         self.probability_spin.setSpecialValueText("Not Set (-1)")
         self.probability_spin.valueChanged.connect(self.on_property_changed)
         self.probability_spin.setFixedWidth(120)
-        
+
         self.quantity_min_spin = QSpinBox()
         self.quantity_min_spin.setRange(0, 1000)
         self.quantity_min_spin.valueChanged.connect(self.on_property_changed)
         self.quantity_min_spin.setFixedWidth(60)
-        
+
         self.quantity_max_spin = QSpinBox()
         self.quantity_max_spin.setRange(0, 1000)
         self.quantity_max_spin.valueChanged.connect(self.on_property_changed)
         self.quantity_max_spin.setFixedWidth(60)
-        
+
         self.allow_duplicates_check = QCheckBox()
         self.allow_duplicates_check.stateChanged.connect(self.on_property_changed)
         self.allow_duplicates_check.setText("Allow Duplicates")
-        
+
         self.filter_by_zone_check = QCheckBox()
         self.filter_by_zone_check.stateChanged.connect(self.on_property_changed)
         self.filter_by_zone_check.setText("Should Filter Items By Zone")
-        
+
         self.apply_prob_mod_check = QCheckBox()
         self.apply_prob_mod_check.stateChanged.connect(self.on_property_changed)
         self.apply_prob_mod_check.setText("Should Apply Location Specific Probability Modifier")
-        
+
         self.apply_dmg_mod_check = QCheckBox()
         self.apply_dmg_mod_check.stateChanged.connect(self.on_property_changed)
         self.apply_dmg_mod_check.setText("Should Apply Location Specific Damage Modifier")
-        
+
         self.initial_damage_spin = QSpinBox()
         self.initial_damage_spin.setRange(0, 100)
         self.initial_damage_spin.valueChanged.connect(self.on_property_changed)
         self.initial_damage_spin.setFixedWidth(60)
-        
+
         self.random_damage_spin = QSpinBox()
         self.random_damage_spin.setRange(0, 100)
         self.random_damage_spin.valueChanged.connect(self.on_property_changed)
         self.random_damage_spin.setFixedWidth(60)
-        
+
         self.initial_usage_spin = QSpinBox()
         self.initial_usage_spin.setRange(0, 100)
         self.initial_usage_spin.valueChanged.connect(self.on_property_changed)
         self.initial_usage_spin.setFixedWidth(60)
-        
+
         self.random_usage_spin = QSpinBox()
         self.random_usage_spin.setRange(0, 100)
         self.random_usage_spin.valueChanged.connect(self.on_property_changed)
         self.random_usage_spin.setFixedWidth(60)
-        
+
         self.general_layout.addRow("File:", self.file_path_label)
         self.general_layout.addRow("Probability:", self.probability_spin)
         self.general_layout.addRow("Qty Min:", self.quantity_min_spin)
@@ -346,7 +406,7 @@ class SpawnerEditor(QWidget):
         self.general_layout.addRow(self.apply_prob_mod_check)
         self.general_layout.addRow(self.apply_dmg_mod_check)
         scroll_layout.addWidget(self.general_group)
-        
+
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setWidget(scroll_content)
@@ -470,15 +530,33 @@ class SpawnerEditor(QWidget):
 
         item = self.nodes_tree.itemAt(pos)
         if item is None:
+            # Right-clicked on empty space in the tree
             menu.addAction("Add New Item", self.add_item_dialog)
             menu.addAction("Add New Node", self.add_node_dialog)
         else:
+            # Right-clicked on one or more items
             data = item.data(0, Qt.UserRole)
             if not data:
                 return
 
-            node_type, index = data
+            # Get *all* currently selected items (not just the one under the cursor)
+            selected_items = self.nodes_tree.selectedItems()
+            if not selected_items:
+                return
 
+            # Add sub-menu with direct rarity options (applies to all selected)
+            rarity_menu = menu.addMenu("Set Rarity To...")
+            for rarity in self.get_rarity_list():
+                rarity_action = QAction(rarity, self)
+                rarity_action.triggered.connect(
+                    lambda checked, r=rarity, items=selected_items: self.batch_set_rarity(items, r)
+                )
+                rarity_menu.addAction(rarity_action)
+
+            # Separator before destructive actions
+            menu.addSeparator()
+
+            # Keep existing individual-item actions
             menu.addAction("Remove", lambda: self.remove_selected_node(item))
             menu.addAction("Duplicate", lambda: self.duplicate_selected_node(item))
 
@@ -496,12 +574,27 @@ class SpawnerEditor(QWidget):
 
         layout.addWidget(QLabel("ID:"))
         id_input = QLineEdit()
+
+        # 🔁 Proper completer setup (like node_tree.py)
         if self._parameters_data:
             model = QStringListModel(self._parameters_data)
             completer = QCompleter(model, id_input)
-            completer.setFilterMode(Qt.MatchContains)
             completer.setCaseSensitivity(Qt.CaseInsensitive)
+            completer.setCompletionMode(QCompleter.PopupCompletion)
+            completer.setFilterMode(Qt.MatchContains)
+
+            # Popup customization
+            popup = QListView()
+            popup.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            popup.setWordWrap(False)
+            popup.setMinimumWidth(300)
+            completer.setPopup(popup)
+
+            delegate = CompleterDelegate()
+            popup.setItemDelegate(delegate)
+
             id_input.setCompleter(completer)
+
         layout.addWidget(id_input)
 
         btn_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -534,12 +627,27 @@ class SpawnerEditor(QWidget):
 
         layout.addWidget(QLabel("IDs (comma-separated):"))
         ids_input = QLineEdit()
+
+        # 🔁 Proper completer setup (like node_tree.py)
         if self._parameters_data:
             model = QStringListModel(self._parameters_data)
             completer = QCompleter(model, ids_input)
-            completer.setFilterMode(Qt.MatchContains)
             completer.setCaseSensitivity(Qt.CaseInsensitive)
+            completer.setCompletionMode(QCompleter.PopupCompletion)
+            completer.setFilterMode(Qt.MatchContains)
+
+            # Popup customization
+            popup = QListView()
+            popup.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            popup.setWordWrap(False)
+            popup.setMinimumWidth(300)
+            completer.setPopup(popup)
+
+            delegate = CompleterDelegate()
+            popup.setItemDelegate(delegate)
+
             ids_input.setCompleter(completer)
+
         layout.addWidget(ids_input)
 
         btn_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -881,6 +989,54 @@ class SpawnerEditor(QWidget):
                 if idx < len(node_list):
                     node_list[idx]["Rarity"] = new_rarity
                     tree_item.setText(0, new_rarity)
+
+    def set_rarity_for_item(self, tree_item, new_rarity):
+        """Set the rarity of a single tree item and update underlying data."""
+        data = tree_item.data(0, Qt.UserRole)
+        if not data:
+            return
+
+        node_type, idx = data
+        node_list = []
+        if node_type == "Item":
+            node_list = self.current_data.get("Items", [])
+        elif node_type == "Node":
+            node_list = self.current_data.get("Nodes", [])
+        else:
+            return
+
+        if idx < len(node_list):
+            node_list[idx]["Rarity"] = new_rarity
+            tree_item.setText(0, new_rarity)
+
+    def batch_set_rarity(self, tree_items, new_rarity):
+        """Set the rarity of multiple tree items and update underlying data."""
+        if not self.current_data or not new_rarity:
+            return
+
+        processed = set()  # To avoid updating the same node twice (in case of duplicates)
+        for tree_item in tree_items:
+            data = tree_item.data(0, Qt.UserRole)
+            if not data:
+                continue
+
+            node_type, idx = data
+            key = (node_type, idx)
+            if key in processed:
+                continue
+            processed.add(key)
+
+            node_list = []
+            if node_type == "Item":
+                node_list = self.current_data.get("Items", [])
+            elif node_type == "Node":
+                node_list = self.current_data.get("Nodes", [])
+            else:
+                continue
+
+            if idx < len(node_list):
+                node_list[idx]["Rarity"] = new_rarity
+                tree_item.setText(0, new_rarity)
 
     def closeEvent(self, event):
         self.save_settings()
