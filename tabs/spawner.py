@@ -112,12 +112,17 @@ class SpawnerEditor(QWidget):
         self.open_button.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         self.open_button.clicked.connect(self.open_file)
 
+        self.close_button = QPushButton("Close")
+        self.close_button.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+        self.close_button.clicked.connect(self.close_file)
+        
         self.save_button = QPushButton("Save")
         self.save_button.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         self.save_button.clicked.connect(self.save_file)
 
         button_layout.addWidget(self.open_button)
         button_layout.addWidget(self.save_button)
+        button_layout.addWidget(self.close_button)
 
         button_frame.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
         button_frame.setFixedHeight(40)
@@ -476,6 +481,35 @@ class SpawnerEditor(QWidget):
             self.save_settings()
         except Exception as e:
             print(f"Error saving file: {e}")
+
+    def close_file(self):
+        if not self.current_file_path:
+            return
+
+        self.current_data = None
+        self.current_file_path = None
+        self.file_path_label.setText("None")
+        
+        self.nodes_tree.clear()
+        self.ids_list_widget.clear()
+        self.rarity_combo.clear()
+        self.rarity_combo.addItems(self.get_rarity_list())
+        self.rarity_combo.setCurrentIndex(-1)
+        
+        self.probability_spin.setValue(-1)
+        self.quantity_min_spin.setValue(0)
+        self.quantity_max_spin.setValue(0)
+        self.allow_duplicates_check.setChecked(False)
+        self.filter_by_zone_check.setChecked(False)
+        self.apply_prob_mod_check.setChecked(False)
+        self.apply_dmg_mod_check.setChecked(False)
+        self.initial_damage_spin.setValue(0)
+        self.random_damage_spin.setValue(0)
+        self.initial_usage_spin.setValue(0)
+        self.random_usage_spin.setValue(0)
+        
+        for i in range(self.post_spawn_list.count()):
+            self.post_spawn_list.item(i).setCheckState(Qt.Unchecked)
 
     def update_properties_ui(self):
         if not self.current_data:

@@ -234,12 +234,17 @@ class NodeTreeViewer(QWidget):
         self.open_button.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         self.open_button.clicked.connect(self._load_json_file)
 
+        self.close_button = QPushButton("Close")
+        self.close_button.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+        self.close_button.clicked.connect(self._close_file)
+        
         self.save_button = QPushButton("Save")
         self.save_button.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         self.save_button.clicked.connect(self._save_json_file)
 
         button_layout.addWidget(self.open_button)
         button_layout.addWidget(self.save_button)
+        button_layout.addWidget(self.close_button)
 
         button_frame.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
         button_frame.setFixedHeight(40)
@@ -262,6 +267,14 @@ class NodeTreeViewer(QWidget):
         layout.addWidget(button_frame)
         layout.addWidget(self.tree_view)
         layout.setStretch(1, 1)
+
+    def _close_file(self):
+        if not self.current_file:
+            return
+
+        self.model.clear()
+        self.tree_view.expandAll()
+        self.current_file = None
 
     def _load_settings(self):
         settings = self.settings_manager.load_settings('node_editor')

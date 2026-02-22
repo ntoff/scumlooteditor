@@ -38,12 +38,17 @@ class ParametersEditor(QWidget):
         self.open_button.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         self.open_button.clicked.connect(self.open_file)
 
+        self.close_button = QPushButton("Close")
+        self.close_button.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+        self.close_button.clicked.connect(self.close_file)
+        
         self.save_button = QPushButton("Save")
         self.save_button.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         self.save_button.clicked.connect(self.save_file)
 
         button_layout.addWidget(self.open_button)
         button_layout.addWidget(self.save_button)
+        button_layout.addWidget(self.close_button)
 
         button_frame.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
         button_frame.setFixedHeight(40)
@@ -179,16 +184,17 @@ class ParametersEditor(QWidget):
         if self.data and "Parameters" in self.data:
             for item in self.data["Parameters"]:
                 tree_item = QTreeWidgetItem()
-                tree_item.setText(0, str(item["Id"]))
-                tree_item.setText(1, str(item["IsDisabledForSpawning"]).lower())
-                tree_item.setText(2, str(item["AllowedLocations"]))
-                tree_item.setText(3, str(item["CooldownPerSquadMemberMin"]))
-                tree_item.setText(4, str(item["CooldownPerSquadMemberMax"]))
-                tree_item.setText(5, str(item["CooldownGroup"]))
-                tree_item.setText(6, str(item["Variations"]))
-                tree_item.setText(7, str(item["ShouldOverrideInitialAndRandomUsage"]).lower())
-                tree_item.setText(8, str(item["InitialUsageOverride"]))
-                tree_item.setText(9, str(item["RandomUsageOverrideUsage"]))
+                # Use .get() with safe defaults for missing keys
+                tree_item.setText(0, str(item.get("Id", "")))
+                tree_item.setText(1, str(item.get("IsDisabledForSpawning", False)).lower())
+                tree_item.setText(2, str(item.get("AllowedLocations", [])))
+                tree_item.setText(3, str(item.get("CooldownPerSquadMemberMin", 0)))
+                tree_item.setText(4, str(item.get("CooldownPerSquadMemberMax", 0)))
+                tree_item.setText(5, str(item.get("CooldownGroup", "")))
+                tree_item.setText(6, str(item.get("Variations", [])))
+                tree_item.setText(7, str(item.get("ShouldOverrideInitialAndRandomUsage", False)).lower())
+                tree_item.setText(8, str(item.get("InitialUsageOverride", 0)))
+                tree_item.setText(9, str(item.get("RandomUsageOverrideUsage", 0)))
                 self.tree.addTopLevelItem(tree_item)
 
     def save_file(self):
@@ -221,6 +227,16 @@ class ParametersEditor(QWidget):
             self.save_settings()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save file: {e}")
+
+    def close_file(self):
+        if not self.current_file_path:
+            return
+
+        self.data = None
+        self.current_file_path = None
+        self.tree.clear()
+        self.update_counter()
+        self.filter_input.clear()
 
     def parse_list(self, value):
         if value.startswith('[') and value.endswith(']'):
