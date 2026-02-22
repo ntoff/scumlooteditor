@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (
     QFrame, QLabel, QLineEdit, QPushButton, QScrollArea, QHeaderView,
     QStyledItemDelegate, QFileDialog, QMessageBox, QTextEdit,
     QDialog, QDialogButtonBox, QInputDialog, QCompleter, QListView,
-    QAbstractItemView
+    QAbstractItemView, QButtonGroup, QCheckBox
 )
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QStringListModel, QByteArray
 
@@ -23,6 +23,7 @@ class ParametersEditor(QWidget):
         self.filtered_items = []
         self.current_filtered_index = -1
         self.settings_manager = settings_manager or SettingsManager()
+        self.all_items = []  # Store all QTreeWidgetItems for filtering
 
         self.initUI()
         self.load_settings()
@@ -59,6 +60,7 @@ class ParametersEditor(QWidget):
         filter_layout = QHBoxLayout(filter_frame)
         filter_layout.setAlignment(Qt.AlignLeft)
 
+        # ID Filter
         filter_label = QLabel("Find ID:")
         self.filter_input = QLineEdit()
         self.filter_input.setMaxLength(50)
@@ -66,23 +68,55 @@ class ParametersEditor(QWidget):
         self.filter_input.setMaximumWidth(200)
         self.filter_input.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         self.filter_input.textChanged.connect(self.filter_items)
+        self.filter_input.setClearButtonEnabled(True)
 
-        prev_button = QPushButton("Previous")
-        prev_button.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
-        prev_button.clicked.connect(self.previous_match)
+        self.prev_button = QPushButton("Previous")
+        self.prev_button.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+        self.prev_button.clicked.connect(self.previous_match)
+        self.prev_button.setEnabled(False)
 
-        next_button = QPushButton("Next")
-        next_button.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
-        next_button.clicked.connect(self.next_match)
+        self.next_button = QPushButton("Next")
+        self.next_button.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+        self.next_button.clicked.connect(self.next_match)
+        self.next_button.setEnabled(False)
 
         self.counter_label = QLabel("0/0")
         self.counter_label.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+        self.counter_label.setMinimumWidth(60)
+        #self.counter_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
-        filter_layout.addWidget(filter_label)
-        filter_layout.addWidget(self.filter_input)
-        filter_layout.addWidget(prev_button)
-        filter_layout.addWidget(next_button)
-        filter_layout.addWidget(self.counter_label)
+        # Status Filter (Enabled / Disabled)
+        status_label = QLabel("Show only:")
+        self.enabled_checkbox = QCheckBox("Enabled")
+        self.disabled_checkbox = QCheckBox("Disabled")
+
+        # Allow unchecking the last button → supports "show all"
+        self.enabled_checkbox.toggled.connect(self.on_enabled_toggled)
+        self.disabled_checkbox.toggled.connect(self.on_disabled_toggled)
+
+        # Initialize both unchecked (default)
+        self.enabled_checkbox.setChecked(False)
+        self.disabled_checkbox.setChecked(False)
+
+        # Layout the ID filter part
+        id_filter_layout = QHBoxLayout()
+        id_filter_layout.addWidget(filter_label)
+        id_filter_layout.addWidget(self.filter_input)
+        id_filter_layout.addWidget(self.prev_button)
+        id_filter_layout.addWidget(self.next_button)
+        id_filter_layout.addWidget(self.counter_label)
+
+        # Layout the status filter part (right-aligned)
+        status_filter_layout = QHBoxLayout()
+        status_filter_layout.addWidget(status_label)
+        status_filter_layout.addWidget(self.enabled_checkbox)
+        status_filter_layout.addWidget(self.disabled_checkbox)
+        status_filter_layout.addStretch()  # Push to right
+
+        # Combine into main filter layout
+        filter_layout.addLayout(id_filter_layout)
+        filter_layout.addSpacing(8)
+        filter_layout.addLayout(status_filter_layout)
 
         filter_frame.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
         filter_frame.setFixedHeight(50)
@@ -163,6 +197,17 @@ class ParametersEditor(QWidget):
             with open(file_path, 'r') as f:
                 self.current_file_path = file_path
                 self.data = json.load(f)
+
+            # 🔑 Reset status filter to "show all" (both unchecked)
+            self.enabled_checkbox.setChecked(False)
+            self.disabled_checkbox.setChecked(False)
+            self.filter_input.clear()  # Optional: clear search too
+
+            # 🔑 CRITICAL: Clear old item references before repopulating
+            self.all_items.clear()
+            self.filtered_items.clear()
+            self.current_filtered_index = -1
+
             self.populate_tree()
             self.save_settings()
             self.update_counter()
@@ -181,10 +226,10 @@ class ParametersEditor(QWidget):
 
     def populate_tree(self):
         self.tree.clear()
+        self.all_items = []  # Reset list of all items
         if self.data and "Parameters" in self.data:
             for item in self.data["Parameters"]:
                 tree_item = QTreeWidgetItem()
-                # Use .get() with safe defaults for missing keys
                 tree_item.setText(0, str(item.get("Id", "")))
                 tree_item.setText(1, str(item.get("IsDisabledForSpawning", False)).lower())
                 tree_item.setText(2, str(item.get("AllowedLocations", [])))
@@ -196,6 +241,7 @@ class ParametersEditor(QWidget):
                 tree_item.setText(8, str(item.get("InitialUsageOverride", 0)))
                 tree_item.setText(9, str(item.get("RandomUsageOverrideUsage", 0)))
                 self.tree.addTopLevelItem(tree_item)
+                self.all_items.append(tree_item)
 
     def save_file(self):
         if not self.data:
@@ -204,6 +250,8 @@ class ParametersEditor(QWidget):
         items = []
         for i in range(self.tree.topLevelItemCount()):
             item = self.tree.topLevelItem(i)
+            if item.isHidden():
+                continue  # Skip hidden items? Or preserve hidden? → Preserve hidden in original
             param = {
                 "Id": item.text(0),
                 "IsDisabledForSpawning": item.text(1).lower() == "true",
@@ -235,8 +283,11 @@ class ParametersEditor(QWidget):
         self.data = None
         self.current_file_path = None
         self.tree.clear()
-        self.update_counter()
+        self.all_items = []  # Reset item list
         self.filter_input.clear()
+        self.enabled_checkbox.setChecked(False)
+        self.disabled_checkbox.setChecked(False)  # Ensure both unchecked on close
+        self.update_counter()
 
     def parse_list(self, value):
         if value.startswith('[') and value.endswith(']'):
@@ -293,39 +344,65 @@ class ParametersEditor(QWidget):
             if ok:
                 item.setText(column, new_value)
 
-    def filter_items(self, text):
-        filter_text = text.lower()
+    def on_enabled_toggled(self, checked):
+        if checked:
+            self.disabled_checkbox.setChecked(False)
+        self.filter_items()
 
-        self.filtered_items = [
-            self.tree.topLevelItem(i)
-            for i in range(self.tree.topLevelItemCount())
-            if filter_text in self.tree.topLevelItem(i).text(0).lower()
-        ]
+    def on_disabled_toggled(self, checked):
+        if checked:
+            self.enabled_checkbox.setChecked(False)
+        self.filter_items()
 
-        self.current_filtered_index = -1
-        self.update_counter()
+    def filter_items(self):
+        filter_text = self.filter_input.text().lower()
+
+        show_enabled = self.enabled_checkbox.isChecked()
+        show_disabled = self.disabled_checkbox.isChecked()
+        show_all_statuses = not (show_enabled or show_disabled)
+
+        # Hide all items first
+        for item in self.all_items:
+            id_match = filter_text in item.text(0).lower()
+            is_disabled_str = item.text(1)
+            is_disabled = is_disabled_str.lower() == "true"
+            status_match = show_all_statuses or \
+                        (show_enabled and not is_disabled) or \
+                        (show_disabled and is_disabled)
+            item.setHidden(not (id_match and status_match))
+
+        # Rebuild filtered list (only visible items)
+        self.filtered_items = [item for item in self.all_items if not item.isHidden()]
+
+        # 🔑 CRITICAL: Buttons enabled ONLY if:
+        #   1. Filter text is non-empty, AND
+        #   2. At least one item matches
+        has_match = bool(filter_text) and len(self.filtered_items) > 0
+        self.prev_button.setEnabled(has_match)
+        self.next_button.setEnabled(has_match)
 
         self.tree.clearSelection()
+        self.current_filtered_index = -1
 
-        if self.filtered_items and filter_text:
+        if has_match:
             self.tree.itemSelectionChanged.disconnect(self.on_tree_select)
-
             self.tree.setCurrentItem(self.filtered_items[0])
             self.tree.scrollToItem(self.filtered_items[0], QAbstractItemView.PositionAtCenter)
             self.current_filtered_index = 0
-            self.update_counter()
-
             self.tree.itemSelectionChanged.connect(self.on_tree_select)
 
+        self.update_counter()
+
     def update_counter(self):
-        total_items = self.tree.topLevelItemCount()
+        total_items = len(self.all_items)
         if self.filtered_items:
             self.counter_label.setText(f"{self.current_filtered_index + 1}/{len(self.filtered_items)}")
         else:
             self.counter_label.setText(f"0/{total_items}")
 
     def next_match(self):
-        if not self.filtered_items:
+        # 🔒 Only proceed if button is enabled AND there are filtered items
+        if not self.next_button.isEnabled() or not self.filtered_items:
             return
 
         self.current_filtered_index = (self.current_filtered_index + 1) % len(self.filtered_items)
@@ -339,7 +416,8 @@ class ParametersEditor(QWidget):
         self.tree.itemSelectionChanged.connect(self.on_tree_select)
 
     def previous_match(self):
-        if not self.filtered_items:
+        # 🔒 Only proceed if button is enabled AND there are filtered items
+        if not self.prev_button.isEnabled() or not self.filtered_items:
             return
 
         self.current_filtered_index = (self.current_filtered_index - 1) % len(self.filtered_items)
