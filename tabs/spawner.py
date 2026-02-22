@@ -530,35 +530,43 @@ class SpawnerEditor(QWidget):
 
         item = self.nodes_tree.itemAt(pos)
         if item is None:
-            # Right-clicked on empty space in the tree
+            # Right-clicked on empty space: show both options
             menu.addAction("Add New Item", self.add_item_dialog)
             menu.addAction("Add New Node", self.add_node_dialog)
         else:
-            # Right-clicked on one or more items
-            data = item.data(0, Qt.UserRole)
-            if not data:
-                return
+            # Check if item is a root-level group ("Items" or "Nodes")
+            if item.parent() is None:
+                root_text = item.text(0)
+                if root_text == "Items":
+                    menu.addAction("Add New Item", self.add_item_dialog)
+                elif root_text == "Nodes":
+                    menu.addAction("Add New Node", self.add_node_dialog)
+            else:
+                # Item is a child (actual node/item), not a root group
+                data = item.data(0, Qt.UserRole)
+                if not data:
+                    return
 
-            # Get *all* currently selected items (not just the one under the cursor)
-            selected_items = self.nodes_tree.selectedItems()
-            if not selected_items:
-                return
+                # Get *all* currently selected items (not just the one under the cursor)
+                selected_items = self.nodes_tree.selectedItems()
+                if not selected_items:
+                    return
 
-            # Add sub-menu with direct rarity options (applies to all selected)
-            rarity_menu = menu.addMenu("Set Rarity To...")
-            for rarity in self.get_rarity_list():
-                rarity_action = QAction(rarity, self)
-                rarity_action.triggered.connect(
-                    lambda checked, r=rarity, items=selected_items: self.batch_set_rarity(items, r)
-                )
-                rarity_menu.addAction(rarity_action)
+                # Add sub-menu with direct rarity options (applies to all selected)
+                rarity_menu = menu.addMenu("Set Rarity To...")
+                for rarity in self.get_rarity_list():
+                    rarity_action = QAction(rarity, self)
+                    rarity_action.triggered.connect(
+                        lambda checked, r=rarity, items=selected_items: self.batch_set_rarity(items, r)
+                    )
+                    rarity_menu.addAction(rarity_action)
 
-            # Separator before destructive actions
-            menu.addSeparator()
+                # Separator before destructive actions
+                menu.addSeparator()
 
-            # Keep existing individual-item actions
-            menu.addAction("Remove", lambda: self.remove_selected_node(item))
-            menu.addAction("Duplicate", lambda: self.duplicate_selected_node(item))
+                # Keep existing individual-item actions
+                menu.addAction("Remove", lambda: self.remove_selected_node(item))
+                menu.addAction("Duplicate", lambda: self.duplicate_selected_node(item))
 
         action = menu.exec_(self.nodes_tree.mapToGlobal(pos))
 
