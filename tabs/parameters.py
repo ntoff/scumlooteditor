@@ -239,12 +239,21 @@ class ParametersEditor(QWidget):
         if column_widths:
             self.load_column_widths(column_widths)
 
+        header_state_b64 = settings.get('header_state')
+        if header_state_b64:
+            state = QByteArray.fromBase64(header_state_b64.encode('utf-8'))
+            self.tree.header().restoreState(state)
+        # Now apply default sort if no saved state (or keep it as is if restored)
+        # If you want to force Id sort *unless* user has explicitly rearranged/sorted:
+        if not header_state_b64:  # Only if no saved state
+            self.tree.sortItems(0, Qt.AscendingOrder)
+
     def save_settings(self):
         settings = {
             'last_folder': getattr(self, 'last_folder', os.path.expanduser("~")),
-            'column_widths': self.save_column_widths()
+            'column_widths': self.save_column_widths(),
+            'header_state': self.tree.header().saveState().toBase64().data().decode('utf-8')  # 🔑 Save header state
         }
-
         self.settings_manager.save_settings('parameters_editor', settings)
 
     def save_column_widths(self):
@@ -319,10 +328,7 @@ class ParametersEditor(QWidget):
             return
 
         items = []
-        for i in range(self.tree.topLevelItemCount()):
-            item = self.tree.topLevelItem(i)
-            if item.isHidden():
-                continue  # Skip hidden items? Or preserve hidden? → Preserve hidden in original
+        for item in self.all_items:  # ✅ Use all_items to get all items, not just visible ones
             param = {
                 "Id": item.text(0),
                 "IsDisabledForSpawning": item.text(1).lower() == "true",
