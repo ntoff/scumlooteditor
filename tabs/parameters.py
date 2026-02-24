@@ -16,7 +16,7 @@ from settings import SettingsManager
 class CooldownsDialog(QDialog):
     def __init__(self, current_min=None, current_max=None, current_initial=None, current_random=None, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Adjust Cooldowns")
+        self.setWindowTitle("Cooldowns & Usage")
         self.setModal(True)
         self.setMinimumWidth(300)
 
