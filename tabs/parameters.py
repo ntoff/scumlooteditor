@@ -199,6 +199,8 @@ class ParametersEditor(QWidget):
         header = self.tree.header()
         header.setStretchLastSection(True)
         header.setSectionResizeMode(QHeaderView.Interactive)
+        self.tree.setSortingEnabled(True)  # Enable sorting on the tree
+        header.sectionClicked.connect(self.sort_tree)  # Connect header click to manual sort
 
         self.tree.setFrameStyle(QFrame.NoFrame)
         self.tree.setIndentation(0)
@@ -305,6 +307,12 @@ class ParametersEditor(QWidget):
                 tree_item.setText(9, str(item.get("RandomUsageOverrideUsage", 0)))
                 self.tree.addTopLevelItem(tree_item)
                 self.all_items.append(tree_item)
+        # 🔑 Sort by Id (column 0) ascending by default
+        self.tree.sortItems(0, Qt.AscendingOrder)
+
+    def sort_tree(self, column):
+        # Explicitly sort the tree on the clicked column
+        self.tree.sortItems(column, self.tree.header().sortIndicatorOrder())
 
     def save_file(self):
         if not self.data:
