@@ -17,7 +17,9 @@ class TabbedApplication(QtWidgets.QMainWindow):
 
         self.tab_widget = QtWidgets.QTabWidget()
         self.setCentralWidget(self.tab_widget)
-
+        self.status_bar = QtWidgets.QStatusBar()
+        self.setStatusBar(self.status_bar)
+        
         self.init_tabs()
         self._load_shared_settings()
 

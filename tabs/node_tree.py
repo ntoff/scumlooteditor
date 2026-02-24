@@ -306,6 +306,9 @@ class NodeTreeViewer(QWidget):
                 self.tree_view.expandAll()
                 self.current_file = file_path
                 self.last_folder = os.path.dirname(file_path)
+                main_window = self.window()
+                if hasattr(main_window, 'status_bar'):
+                    main_window.status_bar.showMessage(f"Loaded file: {os.path.basename(file_path)}", 15000)
             except Exception as e:
                 self._show_error_message("File Load Error", f"Failed to load JSON file: {e}")
 
@@ -326,6 +329,9 @@ class NodeTreeViewer(QWidget):
             self.current_file = file_path
             self.last_folder = os.path.dirname(file_path)
             #QMessageBox.information(self, "Success", "JSON file saved successfully.")
+            main_window = self.window()
+            if hasattr(main_window, 'status_bar'):
+                main_window.status_bar.showMessage(f"File saved: {os.path.basename(file_path)}", 15000)
             self._save_settings()
         except Exception as e:
             self._show_error_message("File Save Error", f"Failed to save JSON file: {e}")

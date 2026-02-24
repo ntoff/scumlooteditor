@@ -439,7 +439,9 @@ class SpawnerEditor(QWidget):
                     self.current_data = json.load(f)
 
                 self.file_path_label.setText(os.path.basename(file_path))
-
+                main_window = self.window()
+                if hasattr(main_window, 'status_bar'):
+                    main_window.status_bar.showMessage(f"Loaded file: {os.path.basename(file_path)}", 15000)
                 self.update_properties_ui()
                 self.update_nodes_ui()
                 self.update_post_spawn_actions_ui()
@@ -478,6 +480,9 @@ class SpawnerEditor(QWidget):
             with open(self.current_file_path, 'w', encoding='utf-8') as f:
                 json.dump(self.current_data, f, indent=4)
             #print(f"File saved: {self.current_file_path}")
+            main_window = self.window()
+            if hasattr(main_window, 'status_bar'):
+                main_window.status_bar.showMessage(f"File saved: {os.path.basename(self.current_file_path)}", 15000)
             self.save_settings()
         except Exception as e:
             print(f"Error saving file: {e}")

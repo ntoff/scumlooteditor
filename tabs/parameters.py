@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (
     QFrame, QLabel, QLineEdit, QPushButton, QScrollArea, QHeaderView,
     QStyledItemDelegate, QFileDialog, QMessageBox, QTextEdit,
     QDialog, QDialogButtonBox, QInputDialog, QCompleter, QListView,
-    QAbstractItemView, QButtonGroup, QCheckBox, QFormLayout
+    QAbstractItemView, QButtonGroup, QCheckBox, QFormLayout, QGroupBox
 )
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QStringListModel, QByteArray
 
@@ -297,6 +297,9 @@ class ParametersEditor(QWidget):
             self.load_file(file_path)
             self.last_folder = os.path.dirname(file_path)
             self.save_settings()
+            main_window = self.window()
+            if hasattr(main_window, 'status_bar'):
+                main_window.status_bar.showMessage(f"Loaded file: {os.path.basename(file_path)}", 15000)
 
     def populate_tree(self):
         self.tree.clear()
@@ -324,7 +327,7 @@ class ParametersEditor(QWidget):
         self.tree.sortItems(column, self.tree.header().sortIndicatorOrder())
 
     def save_file(self):
-        if not self.data:
+        if not self.data or not self.current_file_path:
             return
 
         items = []
@@ -350,6 +353,9 @@ class ParametersEditor(QWidget):
                 json.dump(self.data, f, indent=4)
             #QMessageBox.information(self, "Success", "File saved successfully!")
             self.save_settings()
+            main_window = self.window()
+            if hasattr(main_window, 'status_bar'):
+                main_window.status_bar.showMessage(f"File saved: {os.path.basename(self.current_file_path)}", 15000)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save file: {e}")
 
