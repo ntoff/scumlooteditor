@@ -1,4 +1,3 @@
-# tabs/parameters.py
 import json
 import os
 from PyQt5 import QtWidgets, QtCore, QtGui
@@ -22,21 +21,18 @@ class CooldownsDialog(QDialog):
 
         layout = QVBoxLayout(self)
 
-        # Inputs
         form_layout = QFormLayout()
         self.min_input = QLineEdit()
         self.max_input = QLineEdit()
         self.initial_input = QLineEdit()
         self.random_input = QLineEdit()
         
-        # Add validators for all inputs
         validator = QtGui.QIntValidator(0, 999999)
         self.min_input.setValidator(validator)
         self.max_input.setValidator(validator)
         self.initial_input.setValidator(validator)
         self.random_input.setValidator(validator)
 
-        # Set defaults if provided
         if current_min is not None:
             self.min_input.setText(str(current_min))
         if current_max is not None:
@@ -53,7 +49,6 @@ class CooldownsDialog(QDialog):
 
         layout.addLayout(form_layout)
 
-        # Buttons
         button_box = QDialogButtonBox(
             QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
             orientation=Qt.Horizontal,
@@ -71,6 +66,7 @@ class CooldownsDialog(QDialog):
             int(self.random_input.text()) if self.random_input.text() else 0
         )
 
+
 class ParametersEditor(QWidget):
     def __init__(self, parent=None, settings_manager=None):
         super().__init__(parent)
@@ -80,7 +76,7 @@ class ParametersEditor(QWidget):
         self.filtered_items = []
         self.current_filtered_index = -1
         self.settings_manager = settings_manager or SettingsManager()
-        self.all_items = []  # Store all QTreeWidgetItems for filtering
+        self.all_items = []
 
         self.initUI()
         self.load_settings()
@@ -91,7 +87,6 @@ class ParametersEditor(QWidget):
         button_frame.setFrameShadow(QFrame.Raised)
         button_layout = QHBoxLayout(button_frame)
         button_layout.setAlignment(Qt.AlignLeft)
-
 
         self.open_button = QPushButton("Open")
         self.open_button.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
@@ -127,7 +122,6 @@ class ParametersEditor(QWidget):
         filter_layout = QHBoxLayout(filter_frame)
         filter_layout.setAlignment(Qt.AlignLeft)
 
-        # ID Filter
         filter_label = QLabel("Find ID:")
         self.filter_input = QLineEdit()
         self.filter_input.setMaxLength(50)
@@ -150,22 +144,17 @@ class ParametersEditor(QWidget):
         self.counter_label = QLabel("0/0")
         self.counter_label.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         self.counter_label.setMinimumWidth(60)
-        #self.counter_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
-        # Status Filter (Enabled / Disabled)
         status_label = QLabel("Show only:")
         self.enabled_checkbox = QCheckBox("Enabled")
         self.disabled_checkbox = QCheckBox("Disabled")
 
-        # Allow unchecking the last button → supports "show all"
         self.enabled_checkbox.toggled.connect(self.on_enabled_toggled)
         self.disabled_checkbox.toggled.connect(self.on_disabled_toggled)
 
-        # Initialize both unchecked (default)
         self.enabled_checkbox.setChecked(False)
         self.disabled_checkbox.setChecked(False)
 
-        # Layout the ID filter part
         id_filter_layout = QHBoxLayout()
         id_filter_layout.addWidget(filter_label)
         id_filter_layout.addWidget(self.filter_input)
@@ -173,14 +162,12 @@ class ParametersEditor(QWidget):
         id_filter_layout.addWidget(self.next_button)
         id_filter_layout.addWidget(self.counter_label)
 
-        # Layout the status filter part (right-aligned)
         status_filter_layout = QHBoxLayout()
         status_filter_layout.addWidget(status_label)
         status_filter_layout.addWidget(self.enabled_checkbox)
         status_filter_layout.addWidget(self.disabled_checkbox)
-        status_filter_layout.addStretch()  # Push to right
+        status_filter_layout.addStretch()
 
-        # Combine into main filter layout
         filter_layout.addLayout(id_filter_layout)
         filter_layout.addSpacing(8)
         filter_layout.addLayout(status_filter_layout)
@@ -209,8 +196,8 @@ class ParametersEditor(QWidget):
         header = self.tree.header()
         header.setStretchLastSection(True)
         header.setSectionResizeMode(QHeaderView.Interactive)
-        self.tree.setSortingEnabled(True)  # Enable sorting on the tree
-        header.sectionClicked.connect(self.sort_tree)  # Connect header click to manual sort
+        self.tree.setSortingEnabled(True)
+        header.sectionClicked.connect(self.sort_tree)
 
         self.tree.setFrameStyle(QFrame.NoFrame)
         self.tree.setIndentation(0)
@@ -234,16 +221,13 @@ class ParametersEditor(QWidget):
 
         self.tree.itemSelectionChanged.connect(self.on_tree_select)
         self.tree.itemDoubleClicked.connect(self.on_double_click)
-        # Enable context menu on tree widget
         self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tree.customContextMenuRequested.connect(self.on_tree_context_menu)
-        # Enable multi-selection (Shift/Ctrl + click)
         self.tree.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.tree.setSelectionBehavior(QAbstractItemView.SelectRows)
 
     def load_settings(self):
         settings = self.settings_manager.load_settings('parameters_editor')
-
         self.last_folder = settings.get('last_folder', os.path.expanduser("~"))
 
         column_widths = settings.get('column_widths')
@@ -254,16 +238,14 @@ class ParametersEditor(QWidget):
         if header_state_b64:
             state = QByteArray.fromBase64(header_state_b64.encode('utf-8'))
             self.tree.header().restoreState(state)
-        # Now apply default sort if no saved state (or keep it as is if restored)
-        # If you want to force Id sort *unless* user has explicitly rearranged/sorted:
-        if not header_state_b64:  # Only if no saved state
+        if not header_state_b64:
             self.tree.sortItems(0, Qt.AscendingOrder)
 
     def save_settings(self):
         settings = {
             'last_folder': getattr(self, 'last_folder', os.path.expanduser("~")),
             'column_widths': self.save_column_widths(),
-            'header_state': self.tree.header().saveState().toBase64().data().decode('utf-8')  # 🔑 Save header state
+            'header_state': self.tree.header().saveState().toBase64().data().decode('utf-8')
         }
         self.settings_manager.save_settings('parameters_editor', settings)
 
@@ -283,12 +265,10 @@ class ParametersEditor(QWidget):
                 self.current_file_path = file_path
                 self.data = json.load(f)
 
-            # 🔑 Reset status filter to "show all" (both unchecked)
             self.enabled_checkbox.setChecked(False)
             self.disabled_checkbox.setChecked(False)
-            self.filter_input.clear()  # Optional: clear search too
+            self.filter_input.clear()
 
-            # 🔑 CRITICAL: Clear old item references before repopulating
             self.all_items.clear()
             self.filtered_items.clear()
             self.current_filtered_index = -1
@@ -315,7 +295,7 @@ class ParametersEditor(QWidget):
 
     def populate_tree(self):
         self.tree.clear()
-        self.all_items = []  # Reset list of all items
+        self.all_items = []
         if self.data and "Parameters" in self.data:
             for item in self.data["Parameters"]:
                 tree_item = QTreeWidgetItem()
@@ -331,11 +311,9 @@ class ParametersEditor(QWidget):
                 tree_item.setText(9, str(item.get("RandomUsageOverrideUsage", 0)))
                 self.tree.addTopLevelItem(tree_item)
                 self.all_items.append(tree_item)
-        # 🔑 Sort by Id (column 0) ascending by default
         self.tree.sortItems(0, Qt.AscendingOrder)
 
     def sort_tree(self, column):
-        # Explicitly sort the tree on the clicked column
         self.tree.sortItems(column, self.tree.header().sortIndicatorOrder())
 
     def save_file(self):
@@ -343,7 +321,7 @@ class ParametersEditor(QWidget):
             return
 
         items = []
-        for item in self.all_items:  # ✅ Use all_items to get all items, not just visible ones
+        for item in self.all_items:
             param = {
                 "Id": item.text(0),
                 "IsDisabledForSpawning": item.text(1).lower() == "true",
@@ -363,7 +341,6 @@ class ParametersEditor(QWidget):
         try:
             with open(self.current_file_path, 'w') as f:
                 json.dump(self.data, f, indent=4)
-            #QMessageBox.information(self, "Success", "File saved successfully!")
             self.save_settings()
             main_window = self.window()
             if hasattr(main_window, 'status_bar'):
@@ -379,10 +356,10 @@ class ParametersEditor(QWidget):
         self.current_file_path = None
         self.file_info_label.setText("No file loaded")
         self.tree.clear()
-        self.all_items = []  # Reset item list
+        self.all_items = []
         self.filter_input.clear()
         self.enabled_checkbox.setChecked(False)
-        self.disabled_checkbox.setChecked(False)  # Ensure both unchecked on close
+        self.disabled_checkbox.setChecked(False)
         self.update_counter()
 
     def parse_list(self, value):
@@ -404,7 +381,6 @@ class ParametersEditor(QWidget):
 
         value = item.text(column)
 
-        # Handle AllowedLocations (column 2) with checkboxes
         if column == 2:
             dialog = QDialog(self)
             dialog.setWindowTitle("Edit AllowedLocations")
@@ -413,10 +389,8 @@ class ParametersEditor(QWidget):
             layout = QVBoxLayout()
             dialog.setLayout(layout)
 
-            # Static location list
             locations = ['Coastal', 'Continental', 'Mountain']
 
-            # Scrollable container for checkboxes
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
             content = QWidget()
@@ -424,7 +398,6 @@ class ParametersEditor(QWidget):
             content_layout.setAlignment(Qt.AlignTop)
             content.setLayout(content_layout)
 
-            # Parse current value and pre-check checkboxes
             current_locs = self.parse_list(value)
 
             for loc in locations:
@@ -434,7 +407,6 @@ class ParametersEditor(QWidget):
 
             scroll.setWidget(content)
 
-            # OK / Cancel buttons
             button_box = QDialogButtonBox(
                 QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
                 orientation=Qt.Horizontal,
@@ -449,7 +421,6 @@ class ParametersEditor(QWidget):
             dialog.resize(300, 200)
 
             if dialog.exec_() == QDialog.Accepted:
-                # Build updated list of selected locations
                 selected_locs = [
                     loc for loc in locations
                     if any(cb.text() == loc and cb.isChecked() for cb in content.findChildren(QCheckBox))
@@ -457,7 +428,6 @@ class ParametersEditor(QWidget):
                 item.setText(2, str(selected_locs))
 
         elif column == 6:
-            # Variations: Keep original QTextEdit dialog
             dialog = QDialog(self)
             dialog.setWindowTitle(f"Edit {self.tree.headerItem().text(column)}")
             dialog.setModal(True)
@@ -493,34 +463,23 @@ class ParametersEditor(QWidget):
                 item.setText(column, new_value)
 
     def edit_allowed_locations(self, items=None):
-        """
-        Edit AllowedLocations for a single item or multiple items.
-        If multiple items are provided, shows a dialog that handles 'mixed' states.
-        """
-        # Default: single item (backward compatibility)
         if items is None:
-            # For context menu, this shouldn't happen now, but keep for safety
             items = [self.tree.currentItem()]
         
-        # Ensure items list is non-empty
         if not items:
             return
 
-        # Collect all current location sets
         all_loc_sets = []
         for item in items:
             value = item.text(2)
             locs = set(self.parse_list(value))
             all_loc_sets.append(locs)
 
-        # Determine if all are the same
         if len(set(map(frozenset, all_loc_sets))) == 1:
-            # All same → use that value as default
             current_locs = all_loc_sets[0]
             is_mixed = False
         else:
-            # Mixed state
-            current_locs = set()  # or union of all? Better to show empty for clarity
+            current_locs = set()
             is_mixed = True
 
         dialog = QDialog(self)
@@ -535,7 +494,6 @@ class ParametersEditor(QWidget):
             info.setStyleSheet("color: orange;")
             layout.addWidget(info)
 
-        # Static location list
         locations = ['Coastal', 'Continental', 'Mountain']
 
         scroll = QScrollArea()
@@ -545,7 +503,6 @@ class ParametersEditor(QWidget):
         content_layout.setAlignment(Qt.AlignTop)
         content.setLayout(content_layout)
 
-        # Create checkboxes
         checkboxes = {}
         for loc in locations:
             checkbox = QCheckBox(loc)
@@ -556,7 +513,6 @@ class ParametersEditor(QWidget):
         scroll.setWidget(content)
         layout.addWidget(scroll)
 
-        # OK / Cancel buttons
         button_box = QDialogButtonBox(
             QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
             orientation=Qt.Horizontal,
@@ -569,24 +525,17 @@ class ParametersEditor(QWidget):
         dialog.resize(300, 200)
 
         if dialog.exec_() == QDialog.Accepted:
-            # Build final selected locations
             selected_locs = [
                 loc for loc in locations
                 if checkboxes[loc].isChecked()
             ]
-            # Apply to all selected items
             for item in items:
                 item.setText(2, str(selected_locs))
 
     def adjust_cooldowns_batch(self, items):
-        """
-        Adjusts CooldownPerSquadMemberMin, CooldownPerSquadMemberMax, 
-        InitialUsageOverride, and RandomUsageOverrideUsage for multiple items.
-        """
         if not items:
             return
 
-        # Collect current values to detect if all items have same values
         current_mins = []
         current_maxs = []
         current_initials = []
@@ -598,7 +547,6 @@ class ParametersEditor(QWidget):
             current_initials.append(int(item.text(8)) if item.text(8) else 0)
             current_randoms.append(int(item.text(9)) if item.text(9) else 0)
 
-        # Determine defaults for dialog (use first item's values if all are identical)
         mins_set = set(current_mins)
         maxs_set = set(current_maxs)
         initials_set = set(current_initials)
@@ -636,7 +584,6 @@ class ParametersEditor(QWidget):
         if action is None:
             return
 
-        # Apply selected action to ALL selected items in one batch
         if action == toggle_spawn_action:
             self.toggle_field_batch(selected_items, 1)
         elif action == toggle_override_action:
@@ -647,10 +594,6 @@ class ParametersEditor(QWidget):
             self.adjust_cooldowns_batch(selected_items)
 
     def toggle_field_batch(self, items, column):
-        """
-        Toggles a boolean field for multiple items at once.
-        Assumes the column contains "true"/"false" strings.
-        """
         for item in items:
             current = item.text(column)
             new_val = "false" if current.lower() == "true" else "true"
@@ -673,7 +616,6 @@ class ParametersEditor(QWidget):
         show_disabled = self.disabled_checkbox.isChecked()
         show_all_statuses = not (show_enabled or show_disabled)
 
-        # Hide all items first
         for item in self.all_items:
             id_match = filter_text in item.text(0).lower()
             is_disabled_str = item.text(1)
@@ -683,12 +625,8 @@ class ParametersEditor(QWidget):
                         (show_disabled and is_disabled)
             item.setHidden(not (id_match and status_match))
 
-        # Rebuild filtered list (only visible items)
         self.filtered_items = [item for item in self.all_items if not item.isHidden()]
 
-        # 🔑 CRITICAL: Buttons enabled ONLY if:
-        #   1. Filter text is non-empty, AND
-        #   2. At least one item matches
         has_match = bool(filter_text) and len(self.filtered_items) > 0
         self.prev_button.setEnabled(has_match)
         self.next_button.setEnabled(has_match)
@@ -713,7 +651,6 @@ class ParametersEditor(QWidget):
             self.counter_label.setText(f"0/{total_items}")
 
     def next_match(self):
-        # 🔒 Only proceed if button is enabled AND there are filtered items
         if not self.next_button.isEnabled() or not self.filtered_items:
             return
 
@@ -728,7 +665,6 @@ class ParametersEditor(QWidget):
         self.tree.itemSelectionChanged.connect(self.on_tree_select)
 
     def previous_match(self):
-        # 🔒 Only proceed if button is enabled AND there are filtered items
         if not self.prev_button.isEnabled() or not self.filtered_items:
             return
 
@@ -745,4 +681,3 @@ class ParametersEditor(QWidget):
     def closeEvent(self, event):
         self.save_settings()
         event.accept()
-
