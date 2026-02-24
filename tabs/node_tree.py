@@ -249,6 +249,15 @@ class NodeTreeViewer(QWidget):
         button_frame.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
         button_frame.setFixedHeight(40)
 
+        self.file_info_group = QFrame(self)
+        self.file_info_group.setFrameShape(QFrame.StyledPanel)
+        self.file_info_group.setFrameShadow(QFrame.Raised)
+        file_info_layout = QHBoxLayout(self.file_info_group)
+        file_info_layout.setContentsMargins(4, 4, 4, 4)
+        self.file_info_label = QLabel("No file loaded")
+        self.file_info_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        file_info_layout.addWidget(self.file_info_label)
+
         self.tree_view = QTreeView()
         self.tree_view.setModel(self.model)
         self.tree_view.setAlternatingRowColors(True)
@@ -265,8 +274,9 @@ class NodeTreeViewer(QWidget):
 
         layout = QVBoxLayout(self)
         layout.addWidget(button_frame)
+        layout.addWidget(self.file_info_group)
         layout.addWidget(self.tree_view)
-        layout.setStretch(1, 1)
+        layout.setStretch(2, 1)
 
     def _close_file(self):
         if not self.current_file:
@@ -275,6 +285,7 @@ class NodeTreeViewer(QWidget):
         self.model.clear()
         self.tree_view.expandAll()
         self.current_file = None
+        self.file_info_label.setText("No file loaded")
 
     def _load_settings(self):
         settings = self.settings_manager.load_settings('node_editor')
@@ -306,6 +317,7 @@ class NodeTreeViewer(QWidget):
                 self.tree_view.expandAll()
                 self.current_file = file_path
                 self.last_folder = os.path.dirname(file_path)
+                self.file_info_label.setText(f"File: {os.path.abspath(file_path)}")
                 main_window = self.window()
                 if hasattr(main_window, 'status_bar'):
                     main_window.status_bar.showMessage(f"Loaded file: {os.path.basename(file_path)}", 15000)

@@ -92,6 +92,7 @@ class ParametersEditor(QWidget):
         button_layout = QHBoxLayout(button_frame)
         button_layout.setAlignment(Qt.AlignLeft)
 
+
         self.open_button = QPushButton("Open")
         self.open_button.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         self.open_button.clicked.connect(self.open_file)
@@ -110,6 +111,15 @@ class ParametersEditor(QWidget):
 
         button_frame.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
         button_frame.setFixedHeight(40)
+
+        self.file_info_group = QFrame(self)
+        self.file_info_group.setFrameShape(QFrame.StyledPanel)
+        self.file_info_group.setFrameShadow(QFrame.Raised)
+        file_info_layout = QHBoxLayout(self.file_info_group)
+        file_info_layout.setContentsMargins(4, 4, 4, 4)
+        self.file_info_label = QLabel("No file loaded")
+        self.file_info_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        file_info_layout.addWidget(self.file_info_label)
 
         filter_frame = QFrame(self)
         filter_frame.setFrameShape(QFrame.StyledPanel)
@@ -215,6 +225,7 @@ class ParametersEditor(QWidget):
 
         main_layout = QVBoxLayout(self)
         main_layout.addWidget(button_frame)
+        main_layout.addWidget(self.file_info_group)
         main_layout.addWidget(filter_frame)
         main_layout.addWidget(tree_frame)
         main_layout.setStretch(2, 1)
@@ -297,6 +308,7 @@ class ParametersEditor(QWidget):
             self.load_file(file_path)
             self.last_folder = os.path.dirname(file_path)
             self.save_settings()
+            self.file_info_label.setText(f"File: {os.path.abspath(file_path)}")
             main_window = self.window()
             if hasattr(main_window, 'status_bar'):
                 main_window.status_bar.showMessage(f"Loaded file: {os.path.basename(file_path)}", 15000)
@@ -365,6 +377,7 @@ class ParametersEditor(QWidget):
 
         self.data = None
         self.current_file_path = None
+        self.file_info_label.setText("No file loaded")
         self.tree.clear()
         self.all_items = []  # Reset item list
         self.filter_input.clear()

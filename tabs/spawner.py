@@ -127,7 +127,17 @@ class SpawnerEditor(QWidget):
         button_frame.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
         button_frame.setFixedHeight(40)
 
+        self.file_info_group = QFrame(self)
+        self.file_info_group.setFrameShape(QFrame.StyledPanel)
+        self.file_info_group.setFrameShadow(QFrame.Raised)
+        file_info_layout = QHBoxLayout(self.file_info_group)
+        file_info_layout.setContentsMargins(4, 4, 4, 4)
+        self.file_info_label = QLabel("No file loaded")
+        self.file_info_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        file_info_layout.addWidget(self.file_info_label)
+
         main_layout.addWidget(button_frame)
+        main_layout.addWidget(self.file_info_group)
 
         self.main_splitter = QSplitter(Qt.Vertical)
         main_layout.addWidget(self.main_splitter)
@@ -398,7 +408,7 @@ class SpawnerEditor(QWidget):
         self.random_usage_spin.valueChanged.connect(self.on_property_changed)
         self.random_usage_spin.setFixedWidth(60)
 
-        self.general_layout.addRow("File:", self.file_path_label)
+        #self.general_layout.addRow("File:", self.file_path_label)
         self.general_layout.addRow("Probability:", self.probability_spin)
         self.general_layout.addRow("Qty Min:", self.quantity_min_spin)
         self.general_layout.addRow("Qty Max:", self.quantity_max_spin)
@@ -439,6 +449,7 @@ class SpawnerEditor(QWidget):
                     self.current_data = json.load(f)
 
                 self.file_path_label.setText(os.path.basename(file_path))
+                self.file_info_label.setText(f"File: {os.path.abspath(file_path)}")
                 main_window = self.window()
                 if hasattr(main_window, 'status_bar'):
                     main_window.status_bar.showMessage(f"Loaded file: {os.path.basename(file_path)}", 15000)
@@ -494,6 +505,7 @@ class SpawnerEditor(QWidget):
         self.current_data = None
         self.current_file_path = None
         self.file_path_label.setText("None")
+        self.file_info_label.setText("No file loaded")
         
         self.nodes_tree.clear()
         self.ids_list_widget.clear()
