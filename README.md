@@ -19,4 +19,5 @@ Windows. Written on windows for windows and qt5. Untested on linux or macos.
 Export parameters.json from scum with ``#ExportDefaultItemSpawningParameters``, 
 the game will tell you where you can find the file once exported. Place parameters.json
 in the main directory with "main.py" if you're running the python version or in the same
-directory as the exe file if you downloaded the binary.
+directory as the exe file if you downloaded the binary. This will give you autocomplete
+when adding items. Program will function without it but you lose autocomplete.
