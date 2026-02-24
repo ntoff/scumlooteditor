@@ -340,7 +340,6 @@ class NodeTreeViewer(QWidget):
                 json.dump(data, f, indent=4)
             self.current_file = file_path
             self.last_folder = os.path.dirname(file_path)
-            #QMessageBox.information(self, "Success", "JSON file saved successfully.")
             main_window = self.window()
             if hasattr(main_window, 'status_bar'):
                 main_window.status_bar.showMessage(f"File saved: {os.path.basename(file_path)}", 15000)
@@ -464,10 +463,8 @@ class NodeTreeViewer(QWidget):
 
         layout.addRow("Name:", name_edit)
 
-        # ✅ Replace rarity QLineEdit with QComboBox
         rarity_combo = QComboBox()
         rarity_combo.addItems(self.RARITIES)
-        # Optional: pre-select "Common" for convenience
         rarity_combo.setCurrentIndex(self.RARITIES.index("Common") if "Common" in self.RARITIES else 0)
 
         layout.addRow("Rarity:", rarity_combo)
@@ -481,14 +478,14 @@ class NodeTreeViewer(QWidget):
 
         if dialog.exec_() == QDialog.Accepted:
             name = name_edit.text().strip()
-            rarity = rarity_combo.currentText()  # ← now gets selected value
+            rarity = rarity_combo.currentText()
 
             if not name:
                 QMessageBox.warning(self, "Invalid Input", "Name cannot be empty!")
                 return
 
             child_data = {"Name": name}
-            if rarity and rarity in self.RARITIES:  # ensure validity
+            if rarity and rarity in self.RARITIES:
                 child_data["Rarity"] = rarity
 
             child_item = TreeItem(child_data, parent_item)
