@@ -325,7 +325,7 @@ class NodeTreeViewer(QWidget):
                 json.dump(data, f, indent=4)
             self.current_file = file_path
             self.last_folder = os.path.dirname(file_path)
-            QMessageBox.information(self, "Success", "JSON file saved successfully.")
+            #QMessageBox.information(self, "Success", "JSON file saved successfully.")
             self._save_settings()
         except Exception as e:
             self._show_error_message("File Save Error", f"Failed to save JSON file: {e}")

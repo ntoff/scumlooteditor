@@ -477,7 +477,7 @@ class SpawnerEditor(QWidget):
         try:
             with open(self.current_file_path, 'w', encoding='utf-8') as f:
                 json.dump(self.current_data, f, indent=4)
-            print(f"File saved: {self.current_file_path}")
+            #print(f"File saved: {self.current_file_path}")
             self.save_settings()
         except Exception as e:
             print(f"Error saving file: {e}")

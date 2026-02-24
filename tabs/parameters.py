@@ -348,7 +348,7 @@ class ParametersEditor(QWidget):
         try:
             with open(self.current_file_path, 'w') as f:
                 json.dump(self.data, f, indent=4)
-            QMessageBox.information(self, "Success", "File saved successfully!")
+            #QMessageBox.information(self, "Success", "File saved successfully!")
             self.save_settings()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save file: {e}")
