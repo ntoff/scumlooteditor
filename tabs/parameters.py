@@ -7,12 +7,69 @@ from PyQt5.QtWidgets import (
     QFrame, QLabel, QLineEdit, QPushButton, QScrollArea, QHeaderView,
     QStyledItemDelegate, QFileDialog, QMessageBox, QTextEdit,
     QDialog, QDialogButtonBox, QInputDialog, QCompleter, QListView,
-    QAbstractItemView, QButtonGroup, QCheckBox
+    QAbstractItemView, QButtonGroup, QCheckBox, QFormLayout
 )
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QStringListModel, QByteArray
 
 from settings import SettingsManager
 
+class CooldownsDialog(QDialog):
+    def __init__(self, current_min=None, current_max=None, current_initial=None, current_random=None, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Adjust Cooldowns")
+        self.setModal(True)
+        self.setMinimumWidth(300)
+
+        layout = QVBoxLayout(self)
+
+        # Inputs
+        form_layout = QFormLayout()
+        self.min_input = QLineEdit()
+        self.max_input = QLineEdit()
+        self.initial_input = QLineEdit()
+        self.random_input = QLineEdit()
+        
+        # Add validators for all inputs
+        validator = QtGui.QIntValidator(0, 999999)
+        self.min_input.setValidator(validator)
+        self.max_input.setValidator(validator)
+        self.initial_input.setValidator(validator)
+        self.random_input.setValidator(validator)
+
+        # Set defaults if provided
+        if current_min is not None:
+            self.min_input.setText(str(current_min))
+        if current_max is not None:
+            self.max_input.setText(str(current_max))
+        if current_initial is not None:
+            self.initial_input.setText(str(current_initial))
+        if current_random is not None:
+            self.random_input.setText(str(current_random))
+
+        form_layout.addRow("Cooldown Min:", self.min_input)
+        form_layout.addRow("Cooldown Max:", self.max_input)
+        form_layout.addRow("Initial Usage:", self.initial_input)
+        form_layout.addRow("Random Usage:", self.random_input)
+
+        layout.addLayout(form_layout)
+
+        # Buttons
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+            orientation=Qt.Horizontal,
+            parent=self
+        )
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+
+    def get_values(self):
+        return (
+            int(self.min_input.text()) if self.min_input.text() else 0,
+            int(self.max_input.text()) if self.max_input.text() else 0,
+            int(self.initial_input.text()) if self.initial_input.text() else 0,
+            int(self.random_input.text()) if self.random_input.text() else 0
+        )
 
 class ParametersEditor(QWidget):
     def __init__(self, parent=None, settings_manager=None):
@@ -164,6 +221,12 @@ class ParametersEditor(QWidget):
 
         self.tree.itemSelectionChanged.connect(self.on_tree_select)
         self.tree.itemDoubleClicked.connect(self.on_double_click)
+        # Enable context menu on tree widget
+        self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tree.customContextMenuRequested.connect(self.on_tree_context_menu)
+        # Enable multi-selection (Shift/Ctrl + click)
+        self.tree.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.tree.setSelectionBehavior(QAbstractItemView.SelectRows)
 
     def load_settings(self):
         settings = self.settings_manager.load_settings('parameters_editor')
@@ -308,13 +371,65 @@ class ParametersEditor(QWidget):
 
         value = item.text(column)
 
-        if column in [2, 6]:
+        # Handle AllowedLocations (column 2) with checkboxes
+        if column == 2:
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Edit AllowedLocations")
+            dialog.setModal(True)
+
+            layout = QVBoxLayout()
+            dialog.setLayout(layout)
+
+            # Static location list
+            locations = ['Coastal', 'Continental', 'Mountain']
+
+            # Scrollable container for checkboxes
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            content = QWidget()
+            content_layout = QVBoxLayout()
+            content_layout.setAlignment(Qt.AlignTop)
+            content.setLayout(content_layout)
+
+            # Parse current value and pre-check checkboxes
+            current_locs = self.parse_list(value)
+
+            for loc in locations:
+                checkbox = QCheckBox(loc)
+                checkbox.setChecked(loc in current_locs)
+                content_layout.addWidget(checkbox)
+
+            scroll.setWidget(content)
+
+            # OK / Cancel buttons
+            button_box = QDialogButtonBox(
+                QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+                orientation=Qt.Horizontal,
+                parent=dialog
+            )
+            button_box.accepted.connect(dialog.accept)
+            button_box.rejected.connect(dialog.reject)
+
+            layout.addWidget(scroll)
+            layout.addWidget(button_box)
+
+            dialog.resize(300, 200)
+
+            if dialog.exec_() == QDialog.Accepted:
+                # Build updated list of selected locations
+                selected_locs = [
+                    loc for loc in locations
+                    if any(cb.text() == loc and cb.isChecked() for cb in content.findChildren(QCheckBox))
+                ]
+                item.setText(2, str(selected_locs))
+
+        elif column == 6:
+            # Variations: Keep original QTextEdit dialog
             dialog = QDialog(self)
             dialog.setWindowTitle(f"Edit {self.tree.headerItem().text(column)}")
             dialog.setModal(True)
 
-            layout = QtWidgets.QVBoxLayout()
-
+            layout = QVBoxLayout()
             text_edit = QTextEdit()
             text_edit.setPlainText(value)
             text_edit.setWordWrapMode(QtGui.QTextOption.WrapAnywhere)
@@ -322,7 +437,7 @@ class ParametersEditor(QWidget):
 
             layout.addWidget(text_edit)
 
-            button_layout = QtWidgets.QHBoxLayout()
+            button_layout = QHBoxLayout()
             ok_button = QPushButton("OK")
             cancel_button = QPushButton("Cancel")
 
@@ -331,18 +446,182 @@ class ParametersEditor(QWidget):
 
             button_layout.addWidget(ok_button)
             button_layout.addWidget(cancel_button)
-
             layout.addLayout(button_layout)
 
             dialog.setLayout(layout)
             dialog.resize(500, 300)
 
-            if dialog.exec_() == QtWidgets.QDialog.Accepted:
+            if dialog.exec_() == QDialog.Accepted:
                 item.setText(column, text_edit.toPlainText())
+
         else:
             new_value, ok = QInputDialog.getText(self, "Edit Value", "Enter new value:", text=value)
             if ok:
                 item.setText(column, new_value)
+
+    def edit_allowed_locations(self, items=None):
+        """
+        Edit AllowedLocations for a single item or multiple items.
+        If multiple items are provided, shows a dialog that handles 'mixed' states.
+        """
+        # Default: single item (backward compatibility)
+        if items is None:
+            # For context menu, this shouldn't happen now, but keep for safety
+            items = [self.tree.currentItem()]
+        
+        # Ensure items list is non-empty
+        if not items:
+            return
+
+        # Collect all current location sets
+        all_loc_sets = []
+        for item in items:
+            value = item.text(2)
+            locs = set(self.parse_list(value))
+            all_loc_sets.append(locs)
+
+        # Determine if all are the same
+        if len(set(map(frozenset, all_loc_sets))) == 1:
+            # All same → use that value as default
+            current_locs = all_loc_sets[0]
+            is_mixed = False
+        else:
+            # Mixed state
+            current_locs = set()  # or union of all? Better to show empty for clarity
+            is_mixed = True
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Edit AllowedLocations")
+        dialog.setModal(True)
+
+        layout = QVBoxLayout()
+        dialog.setLayout(layout)
+
+        if is_mixed:
+            info = QLabel("⚠️ Selected items have *different* AllowedLocations. Changes apply to all.")
+            info.setStyleSheet("color: orange;")
+            layout.addWidget(info)
+
+        # Static location list
+        locations = ['Coastal', 'Continental', 'Mountain']
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        content = QWidget()
+        content_layout = QVBoxLayout()
+        content_layout.setAlignment(Qt.AlignTop)
+        content.setLayout(content_layout)
+
+        # Create checkboxes
+        checkboxes = {}
+        for loc in locations:
+            checkbox = QCheckBox(loc)
+            checkbox.setChecked(loc in current_locs)
+            checkboxes[loc] = checkbox
+            content_layout.addWidget(checkbox)
+
+        scroll.setWidget(content)
+        layout.addWidget(scroll)
+
+        # OK / Cancel buttons
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+            orientation=Qt.Horizontal,
+            parent=dialog
+        )
+        button_box.accepted.connect(dialog.accept)
+        button_box.rejected.connect(dialog.reject)
+        layout.addWidget(button_box)
+
+        dialog.resize(300, 200)
+
+        if dialog.exec_() == QDialog.Accepted:
+            # Build final selected locations
+            selected_locs = [
+                loc for loc in locations
+                if checkboxes[loc].isChecked()
+            ]
+            # Apply to all selected items
+            for item in items:
+                item.setText(2, str(selected_locs))
+
+    def adjust_cooldowns_batch(self, items):
+        """
+        Adjusts CooldownPerSquadMemberMin, CooldownPerSquadMemberMax, 
+        InitialUsageOverride, and RandomUsageOverrideUsage for multiple items.
+        """
+        if not items:
+            return
+
+        # Collect current values to detect if all items have same values
+        current_mins = []
+        current_maxs = []
+        current_initials = []
+        current_randoms = []
+        
+        for item in items:
+            current_mins.append(int(item.text(3)) if item.text(3) else 0)
+            current_maxs.append(int(item.text(4)) if item.text(4) else 0)
+            current_initials.append(int(item.text(8)) if item.text(8) else 0)
+            current_randoms.append(int(item.text(9)) if item.text(9) else 0)
+
+        # Determine defaults for dialog (use first item's values if all are identical)
+        mins_set = set(current_mins)
+        maxs_set = set(current_maxs)
+        initials_set = set(current_initials)
+        randoms_set = set(current_randoms)
+        
+        default_min = list(mins_set)[0] if len(mins_set) == 1 else ""
+        default_max = list(maxs_set)[0] if len(maxs_set) == 1 else ""
+        default_initial = list(initials_set)[0] if len(initials_set) == 1 else ""
+        default_random = list(randoms_set)[0] if len(randoms_set) == 1 else ""
+
+        dialog = CooldownsDialog(default_min, default_max, default_initial, default_random, self)
+        if dialog.exec_() == QDialog.Accepted:
+            new_min, new_max, new_initial, new_random = dialog.get_values()
+            for item in items:
+                item.setText(3, str(new_min))
+                item.setText(4, str(new_max))
+                item.setText(8, str(new_initial))
+                item.setText(9, str(new_random))
+
+    def on_tree_context_menu(self, point):
+        selected_items = self.tree.selectedItems()
+        if not selected_items:
+            item = self.tree.itemAt(point)
+            if not item:
+                return
+            selected_items = [item]
+
+        menu = QtWidgets.QMenu(self)
+        toggle_spawn_action = menu.addAction("Toggle Spawn")
+        toggle_override_action = menu.addAction("Toggle Override")
+        edit_locations_action = menu.addAction("Edit locations")
+        adjust_cooldown_action = menu.addAction("Adjust cooldowns && Usages")
+
+        action = menu.exec_(self.tree.viewport().mapToGlobal(point))
+        if action is None:
+            return
+
+        # Apply selected action to ALL selected items in one batch
+        if action == toggle_spawn_action:
+            self.toggle_field_batch(selected_items, 1)
+        elif action == toggle_override_action:
+            self.toggle_field_batch(selected_items, 7)
+        elif action == edit_locations_action:
+            self.edit_allowed_locations(selected_items)
+        elif action == adjust_cooldown_action:
+            self.adjust_cooldowns_batch(selected_items)
+
+    def toggle_field_batch(self, items, column):
+        """
+        Toggles a boolean field for multiple items at once.
+        Assumes the column contains "true"/"false" strings.
+        """
+        for item in items:
+            current = item.text(column)
+            new_val = "false" if current.lower() == "true" else "true"
+            item.setText(column, new_val)
 
     def on_enabled_toggled(self, checked):
         if checked:
@@ -433,3 +712,4 @@ class ParametersEditor(QWidget):
     def closeEvent(self, event):
         self.save_settings()
         event.accept()
+
