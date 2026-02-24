@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (
     QTreeWidget, QTreeWidgetItem, QListWidget, QListWidgetItem, QComboBox,
     QGroupBox, QFormLayout, QSpinBox, QCheckBox, QScrollArea, QDialog,
     QDialogButtonBox, QLineEdit, QCompleter, QMenu, QAction, QHBoxLayout,
-    QLabel
+    QLabel, QListView
 )
 from PyQt5.QtCore import Qt, QStringListModel
 
