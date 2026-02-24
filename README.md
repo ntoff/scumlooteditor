@@ -2,14 +2,14 @@
 
 *Disclaimer: This was an experiment written by AI, may or may not function as desired*
 
-__What is?__
+## What is?
 
 GUI editor for the loot files for the video game SCUM
 
-__Why?__
+## Why?
 
 whyn't?
 
-__For?__
+## For?
 
 Windows. Written on windows for windows and qt5. Untested on linux or macos.
