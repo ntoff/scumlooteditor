@@ -1,4 +1,3 @@
-# tabs/spawner.py
 import json
 import sys
 import os
@@ -8,7 +7,7 @@ from PyQt5.QtWidgets import (
     QTreeWidget, QTreeWidgetItem, QListWidget, QListWidgetItem, QComboBox,
     QGroupBox, QFormLayout, QSpinBox, QCheckBox, QScrollArea, QDialog,
     QDialogButtonBox, QLineEdit, QCompleter, QMenu, QAction, QHBoxLayout,
-    QLabel, QListView
+    QLabel
 )
 from PyQt5.QtCore import Qt, QStringListModel
 
@@ -35,7 +34,7 @@ class SpawnerEditor(QWidget):
         self._loading_data = False
         self._last_used_folder = ""
         self._parameters_data = []
-        self._suppress_rarity_change = False  # Prevent spurious updates
+        self._suppress_rarity_change = False
 
         self.load_parameters_data()
         self.init_ui()
@@ -57,7 +56,6 @@ class SpawnerEditor(QWidget):
         else:
             self.top_splitter.setSizes([300, 700])
 
-        # Restore column widths for tree (Rarity and IDs)
         column_widths = settings.get("column_widths", [])
         if column_widths and len(column_widths) == 2:
             self.nodes_tree.header().resizeSection(0, column_widths[0])
@@ -78,13 +76,10 @@ class SpawnerEditor(QWidget):
         self.settings_manager.save_settings('spawner_editor', settings)
 
     def load_parameters_data(self):
-        """Load parameters.json from the main executable directory."""
         try:
-            # Get the main app directory (not the tabs/ subdirectory)
             main_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
             params_path = os.path.join(main_dir, "parameters.json")
         except Exception:
-            # Fallback: try current working directory (for dev without argv[0])
             params_path = os.path.join(os.getcwd(), "parameters.json")
 
         if os.path.exists(params_path):
@@ -92,11 +87,9 @@ class SpawnerEditor(QWidget):
                 with open(params_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     self._parameters_data = [param["Id"] for param in data.get("Parameters", [])]
-            except Exception as e:
-                print(f"Error loading parameters.json: {e}")
+            except Exception:
                 self._parameters_data = []
         else:
-            print(f"⚠️ parameters.json not found at: {params_path}")
             self._parameters_data = []
 
     def init_ui(self):
@@ -115,7 +108,7 @@ class SpawnerEditor(QWidget):
         self.close_button = QPushButton("Close")
         self.close_button.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         self.close_button.clicked.connect(self.close_file)
-        
+
         self.save_button = QPushButton("Save")
         self.save_button.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         self.save_button.clicked.connect(self.save_file)
@@ -163,7 +156,6 @@ class SpawnerEditor(QWidget):
 
         self.nodes_tree = QTreeWidget()
         self.nodes_tree.setHeaderLabels(["Rarity", "IDs"])
-        # Allow both columns to be resized interactively by the user
         self.nodes_tree.header().setSectionResizeMode(QtWidgets.QHeaderView.Interactive)
         self.nodes_tree.itemSelectionChanged.connect(self.on_node_selection_changed)
         self.nodes_tree.setMinimumWidth(200)
@@ -186,7 +178,6 @@ class SpawnerEditor(QWidget):
         ids_layout.addWidget(self.ids_label)
         ids_layout.addWidget(self.ids_list_widget)
 
-        # Connect itemChanged signal to update tree when IDs change in list
         self.ids_list_widget.itemChanged.connect(self.on_ids_list_item_changed)
 
         self.ids_list_widget.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -297,7 +288,6 @@ class SpawnerEditor(QWidget):
 
         id_input = QLineEdit()
 
-        # 🔁 Proper completer setup (like node_tree.py)
         if self._parameters_data:
             model = QStringListModel(self._parameters_data)
             completer = QCompleter(model, id_input)
@@ -305,7 +295,6 @@ class SpawnerEditor(QWidget):
             completer.setCompletionMode(QCompleter.PopupCompletion)
             completer.setFilterMode(Qt.MatchContains)
 
-            # Popup customization
             popup = QListView()
             popup.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
             popup.setWordWrap(False)
@@ -353,8 +342,6 @@ class SpawnerEditor(QWidget):
         self.general_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         self.general_layout.setContentsMargins(4, 4, 4, 4)
         self.general_layout.setSpacing(6)
-
-        self.file_path_label = QLabel("None")
 
         self.probability_spin = QSpinBox()
         self.probability_spin.setRange(-1, 100)
@@ -408,7 +395,6 @@ class SpawnerEditor(QWidget):
         self.random_usage_spin.valueChanged.connect(self.on_property_changed)
         self.random_usage_spin.setFixedWidth(60)
 
-        #self.general_layout.addRow("File:", self.file_path_label)
         self.general_layout.addRow("Probability:", self.probability_spin)
         self.general_layout.addRow("Qty Min:", self.quantity_min_spin)
         self.general_layout.addRow("Qty Max:", self.quantity_max_spin)
@@ -448,7 +434,6 @@ class SpawnerEditor(QWidget):
                 with open(file_path, 'r', encoding='utf-8') as f:
                     self.current_data = json.load(f)
 
-                self.file_path_label.setText(os.path.basename(file_path))
                 self.file_info_label.setText(f"File: {os.path.abspath(file_path)}")
                 main_window = self.window()
                 if hasattr(main_window, 'status_bar'):
@@ -457,7 +442,6 @@ class SpawnerEditor(QWidget):
                 self.update_nodes_ui()
                 self.update_post_spawn_actions_ui()
 
-                # Auto-select first item for initial view
                 root = self.nodes_tree.invisibleRootItem()
                 items_child = root.child(0) if root.childCount() > 0 else None
                 if items_child and items_child.childCount() > 0:
@@ -476,7 +460,7 @@ class SpawnerEditor(QWidget):
         if not self.current_file_path:
             start_path = getattr(self, '_last_used_folder', "")
             if not start_path or not os.path.isdir(start_path):
-                start_path = QFileDialog.directory().absolutePath if hasattr(QFileDialog, 'directory') else ""
+                start_path = os.getcwd()
 
             file_path, _ = QFileDialog.getSaveFileName(
                 self, "Save JSON File", start_path, "JSON Files (*.json);;All Files (*)"
@@ -490,7 +474,6 @@ class SpawnerEditor(QWidget):
         try:
             with open(self.current_file_path, 'w', encoding='utf-8') as f:
                 json.dump(self.current_data, f, indent=4)
-            #print(f"File saved: {self.current_file_path}")
             main_window = self.window()
             if hasattr(main_window, 'status_bar'):
                 main_window.status_bar.showMessage(f"File saved: {os.path.basename(self.current_file_path)}", 15000)
@@ -504,15 +487,14 @@ class SpawnerEditor(QWidget):
 
         self.current_data = None
         self.current_file_path = None
-        self.file_path_label.setText("None")
         self.file_info_label.setText("No file loaded")
-        
+
         self.nodes_tree.clear()
         self.ids_list_widget.clear()
         self.rarity_combo.clear()
         self.rarity_combo.addItems(self.get_rarity_list())
         self.rarity_combo.setCurrentIndex(-1)
-        
+
         self.probability_spin.setValue(-1)
         self.quantity_min_spin.setValue(0)
         self.quantity_max_spin.setValue(0)
@@ -524,7 +506,7 @@ class SpawnerEditor(QWidget):
         self.random_damage_spin.setValue(0)
         self.initial_usage_spin.setValue(0)
         self.random_usage_spin.setValue(0)
-        
+
         for i in range(self.post_spawn_list.count()):
             self.post_spawn_list.item(i).setCheckState(Qt.Unchecked)
 
@@ -581,11 +563,9 @@ class SpawnerEditor(QWidget):
 
         item = self.nodes_tree.itemAt(pos)
         if item is None:
-            # Right-clicked on empty space: show both options
             menu.addAction("Add New Item", self.add_item_dialog)
             menu.addAction("Add New Node", self.add_node_dialog)
         else:
-            # Check if item is a root-level group ("Items" or "Nodes")
             if item.parent() is None:
                 root_text = item.text(0)
                 if root_text == "Items":
@@ -593,17 +573,14 @@ class SpawnerEditor(QWidget):
                 elif root_text == "Nodes":
                     menu.addAction("Add New Node", self.add_node_dialog)
             else:
-                # Item is a child (actual node/item), not a root group
                 data = item.data(0, Qt.UserRole)
                 if not data:
                     return
 
-                # Get *all* currently selected items (not just the one under the cursor)
                 selected_items = self.nodes_tree.selectedItems()
                 if not selected_items:
                     return
 
-                # Add sub-menu with direct rarity options (applies to all selected)
                 rarity_menu = menu.addMenu("Set Rarity To...")
                 for rarity in self.get_rarity_list():
                     rarity_action = QAction(rarity, self)
@@ -612,10 +589,7 @@ class SpawnerEditor(QWidget):
                     )
                     rarity_menu.addAction(rarity_action)
 
-                # Separator before destructive actions
                 menu.addSeparator()
-
-                # Keep existing individual-item actions
                 menu.addAction("Remove", lambda: self.remove_selected_node(item))
                 menu.addAction("Duplicate", lambda: self.duplicate_selected_node(item))
 
@@ -634,7 +608,6 @@ class SpawnerEditor(QWidget):
         layout.addWidget(QLabel("ID:"))
         id_input = QLineEdit()
 
-        # 🔁 Proper completer setup (like node_tree.py)
         if self._parameters_data:
             model = QStringListModel(self._parameters_data)
             completer = QCompleter(model, id_input)
@@ -642,7 +615,6 @@ class SpawnerEditor(QWidget):
             completer.setCompletionMode(QCompleter.PopupCompletion)
             completer.setFilterMode(Qt.MatchContains)
 
-            # Popup customization
             popup = QListView()
             popup.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
             popup.setWordWrap(False)
@@ -687,7 +659,6 @@ class SpawnerEditor(QWidget):
         layout.addWidget(QLabel("IDs (comma-separated):"))
         ids_input = QLineEdit()
 
-        # 🔁 Proper completer setup (like node_tree.py)
         if self._parameters_data:
             model = QStringListModel(self._parameters_data)
             completer = QCompleter(model, ids_input)
@@ -695,7 +666,6 @@ class SpawnerEditor(QWidget):
             completer.setCompletionMode(QCompleter.PopupCompletion)
             completer.setFilterMode(Qt.MatchContains)
 
-            # Popup customization
             popup = QListView()
             popup.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
             popup.setWordWrap(False)
@@ -798,7 +768,7 @@ class SpawnerEditor(QWidget):
             self.rarity_combo.blockSignals(True)
             self.rarity_combo.clear()
             self.rarity_combo.addItems(self.get_rarity_list())
-            self.rarity_combo.setCurrentIndex(-1)  # No selection
+            self.rarity_combo.setCurrentIndex(-1)
             self.rarity_combo.blockSignals(False)
             return
 
@@ -832,7 +802,6 @@ class SpawnerEditor(QWidget):
 
         node = node_list[index]
 
-        # Update IDs list
         self.ids_list_widget.clear()
         if node_type == "Item":
             id_single = node.get("Id", "")
@@ -843,7 +812,6 @@ class SpawnerEditor(QWidget):
             for id_str in ids:
                 self.ids_list_widget.addItem(id_str)
 
-        # Update rarity combo to show current value (but do NOT trigger change)
         rarity = node.get("Rarity", "Common")
         self.rarity_combo.blockSignals(True)
         self.rarity_combo.clear()
@@ -894,16 +862,13 @@ class SpawnerEditor(QWidget):
 
             if node_type == "Item" and len(new_ids) > 0:
                 node["Id"] = new_ids[0]
-                # Update tree item's second column
                 tree_item.setText(1, new_ids[0])
             elif node_type == "Node":
                 node["Ids"] = new_ids
-                # Update tree item's second column with comma-separated IDs
                 ids_str = ", ".join(new_ids) if new_ids else ""
                 tree_item.setText(1, ids_str)
 
     def on_ids_list_item_changed(self, item):
-        """Update the tree when an item in the IDs list is changed"""
         selected_items = self.nodes_tree.selectedItems()
         if not selected_items or not self.current_data:
             return
@@ -973,11 +938,9 @@ class SpawnerEditor(QWidget):
         self.current_data["PostSpawnActions"] = root_post_spawn_actions
 
     def on_rarity_changed(self, index):
-        # Skip if suppression flag is set or no data
         if self._suppress_rarity_change or not self.current_data:
             return
 
-        # Only proceed if at least one item is selected
         selected_items = self.nodes_tree.selectedItems()
         if not selected_items:
             return
@@ -986,7 +949,6 @@ class SpawnerEditor(QWidget):
         if not new_rarity:
             return
 
-        # Collect unique (node_type, index) to avoid duplicate updates
         processed = set()
 
         for tree_item in selected_items:
@@ -1000,7 +962,6 @@ class SpawnerEditor(QWidget):
                 continue
             processed.add(key)
 
-            # Get the correct node list
             node_list = []
             if node_type == "Item":
                 node_list = self.current_data.get("Items", [])
@@ -1050,7 +1011,6 @@ class SpawnerEditor(QWidget):
                     tree_item.setText(0, new_rarity)
 
     def set_rarity_for_item(self, tree_item, new_rarity):
-        """Set the rarity of a single tree item and update underlying data."""
         data = tree_item.data(0, Qt.UserRole)
         if not data:
             return
@@ -1069,11 +1029,10 @@ class SpawnerEditor(QWidget):
             tree_item.setText(0, new_rarity)
 
     def batch_set_rarity(self, tree_items, new_rarity):
-        """Set the rarity of multiple tree items and update underlying data."""
         if not self.current_data or not new_rarity:
             return
 
-        processed = set()  # To avoid updating the same node twice (in case of duplicates)
+        processed = set()
         for tree_item in tree_items:
             data = tree_item.data(0, Qt.UserRole)
             if not data:
