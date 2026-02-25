@@ -349,14 +349,18 @@ class NodeTreeViewer(QWidget):
 
     def _collect_tree_data(self):
         if not self.model.rootItem or not self.model.rootItem.childCount():
-            return []
+            return {}
+        
         root_children = []
         for i in range(self.model.rowCount()):
             index = self.model.index(i, 0)
             item = index.internalPointer()
             child_data = self._collect_item_data(item)
             root_children.append(child_data)
-        return root_children
+        
+        # Return single dict if only one child (preserves original structure)
+        # Return list if multiple children (handles multiple root objects)
+        return root_children[0] if len(root_children) == 1 else root_children
 
     def _collect_item_data(self, item):
         name = item.itemData.get("Name", "")
