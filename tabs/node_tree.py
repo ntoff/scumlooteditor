@@ -215,7 +215,9 @@ class NodeTreeViewer(QWidget):
         self.model = TreeModel()
         self.selected_item = None
         self.settings_manager = settings_manager or SettingsManager()
-
+        
+        self._is_modified = False
+        
         self._initialize_ui()
         self._load_settings()
 
@@ -242,7 +244,12 @@ class NodeTreeViewer(QWidget):
         self.save_button.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         self.save_button.clicked.connect(self._save_json_file)
 
+        self.new_button = QPushButton("New")
+        self.new_button.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+        self.new_button.clicked.connect(self._create_new_file)
+
         button_layout.addWidget(self.open_button)
+        button_layout.addWidget(self.new_button)
         button_layout.addWidget(self.save_button)
         button_layout.addWidget(self.close_button)
 
@@ -277,6 +284,45 @@ class NodeTreeViewer(QWidget):
         layout.addWidget(self.file_info_group)
         layout.addWidget(self.tree_view)
         layout.setStretch(2, 1)
+
+    def _update_file_info_label(self):
+        if self.current_file:
+            text = f"File: {os.path.abspath(self.current_file)}"
+        else:
+            text = "New file (unsaved)"
+        if self._is_modified:
+            text += " *"
+        self.file_info_label.setText(text)
+
+    def _set_modified(self, modified=True):
+        if modified == self._is_modified:
+            return
+        self._is_modified = modified
+        self._update_file_info_label()
+
+    def _create_new_file(self):
+        # Reset model
+        self.model.clear()
+        
+        # Create new root structure
+        new_data = {
+            "Name": "ItemLootTreeNodes",
+            "Rarity": "Common",
+            "Children": []
+        }
+        
+        # Load into model
+        self.model.setupModelData(new_data)
+        
+        # Expand tree
+        self.tree_view.expandAll()
+        
+        # Update state
+        self.current_file = None  # unsaved new file
+        self.file_info_label.setText("New file (unsaved)")
+        main_window = self.window()
+        if hasattr(main_window, 'status_bar'):
+            main_window.status_bar.showMessage("New file created", 15000)
 
     def _close_file(self):
         if not self.current_file:
@@ -318,6 +364,7 @@ class NodeTreeViewer(QWidget):
                 self.current_file = file_path
                 self.last_folder = os.path.dirname(file_path)
                 self.file_info_label.setText(f"File: {os.path.abspath(file_path)}")
+                self._set_modified(False)
                 main_window = self.window()
                 if hasattr(main_window, 'status_bar'):
                     main_window.status_bar.showMessage(f"Loaded file: {os.path.basename(file_path)}", 15000)
@@ -340,6 +387,10 @@ class NodeTreeViewer(QWidget):
                 json.dump(data, f, indent=4)
             self.current_file = file_path
             self.last_folder = os.path.dirname(file_path)
+            self._set_modified(False)
+            # ✅ Update file info label to show the now-open saved file
+            self.file_info_label.setText(f"File: {os.path.abspath(file_path)}")
+            
             main_window = self.window()
             if hasattr(main_window, 'status_bar'):
                 main_window.status_bar.showMessage(f"File saved: {os.path.basename(file_path)}", 15000)
@@ -500,6 +551,7 @@ class NodeTreeViewer(QWidget):
                 row = parent_item.childCount() - 1
                 self.model.beginInsertRows(parent_index, row, row)
                 self.model.endInsertRows()
+                self._set_modified(True)
 
     def _delete_item(self, item):
         parent = item.parent()
@@ -508,6 +560,7 @@ class NodeTreeViewer(QWidget):
             self.model.beginRemoveRows(self.model.indexFromItem(parent), row, row)
             parent.childItems.remove(item)
             self.model.endRemoveRows()
+            self._set_modified(True)
         else:
             QMessageBox.information(self, "Cannot Delete", "Top-level items cannot be deleted.")
 
@@ -522,6 +575,7 @@ class NodeTreeViewer(QWidget):
         row = item.row()
         index = self.model.createIndex(row, 0, item)
         self.model.dataChanged.emit(index, index)
+        self._set_modified(True)
 
     def _change_merge_mode(self, item, mode):
         if mode == "None":
@@ -540,6 +594,7 @@ class NodeTreeViewer(QWidget):
         top_left = self.model.createIndex(row, self.MERGE_MODE_COLUMN, item)
         bottom_right = self.model.createIndex(row, self.MERGE_MODE_COLUMN, item)
         self.model.dataChanged.emit(top_left, bottom_right, [Qt.DisplayRole])
+        self._set_modified(True)
 
     def _change_post_spawn_action(self, item, action):
         if action == "None":
@@ -555,6 +610,7 @@ class NodeTreeViewer(QWidget):
         top_left = self.model.createIndex(row, self.ACTION_COLUMN, item)
         bottom_right = self.model.createIndex(row, self.ACTION_COLUMN, item)
         self.model.dataChanged.emit(top_left, bottom_right, [Qt.DisplayRole])
+        self._set_modified(True)
 
     def _on_item_double_clicked(self, index):
         if not index.isValid():
@@ -592,6 +648,7 @@ class NodeTreeViewer(QWidget):
                 row = item.row()
                 model_index = self.model.createIndex(row, self.MERGE_MODE_COLUMN, item)
                 self.model.dataChanged.emit(model_index, model_index, [Qt.DisplayRole])
+                self._set_modified(True)
 
         elif column == self.ACTION_COLUMN:
             dialog = QDialog(self)
@@ -623,6 +680,7 @@ class NodeTreeViewer(QWidget):
                 row = item.row()
                 model_index = self.model.createIndex(row, self.ACTION_COLUMN, item)
                 self.model.dataChanged.emit(model_index, model_index, [Qt.DisplayRole])
+                self._set_modified(True)
 
     def _load_parameters(self):
         parameters = []
