@@ -275,7 +275,6 @@ class NodeTreeViewer(QWidget):
         self.tree_view.setColumnWidth(0, 200)
         self.tree_view.setColumnWidth(1, 150)
         self.tree_view.setColumnWidth(2, 120)
-        self.tree_view.doubleClicked.connect(self._on_item_double_clicked)
         self.tree_view.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tree_view.customContextMenuRequested.connect(self._show_context_menu)
 
@@ -629,76 +628,6 @@ class NodeTreeViewer(QWidget):
         bottom_right = self.model.createIndex(row, self.ACTION_COLUMN, item)
         self.model.dataChanged.emit(top_left, bottom_right, [Qt.DisplayRole])
         self._set_modified(True)
-
-    def _on_item_double_clicked(self, index):
-        if not index.isValid():
-            return
-
-        column = index.column()
-        item = index.internalPointer()
-
-        if column == self.MERGE_MODE_COLUMN:
-            dialog = QDialog(self)
-            dialog.setWindowTitle("Select ChildrenMergeMode")
-            layout = QVBoxLayout(dialog)
-
-            combo_box = QComboBox()
-            combo_box.addItems(self.MERGE_MODE_OPTIONS)
-            current_mode = item.childrenMergeMode
-            if current_mode and current_mode in self.MERGE_MODE_OPTIONS:
-                combo_box.setCurrentText(current_mode)
-            else:
-                combo_box.setCurrentText("None")
-
-            layout.addWidget(QLabel("Select merge mode:"))
-            layout.addWidget(combo_box)
-
-            buttons = QDialogButtonBox(
-                QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
-                Qt.Horizontal, dialog)
-            buttons.accepted.connect(dialog.accept)
-            buttons.rejected.connect(dialog.reject)
-            layout.addWidget(buttons)
-
-            if dialog.exec_() == QDialog.Accepted:
-                selected_mode = combo_box.currentText()
-                self._change_merge_mode(item, selected_mode)
-                row = item.row()
-                model_index = self.model.createIndex(row, self.MERGE_MODE_COLUMN, item)
-                self.model.dataChanged.emit(model_index, model_index, [Qt.DisplayRole])
-                self._set_modified(True)
-
-        elif column == self.ACTION_COLUMN:
-            dialog = QDialog(self)
-            dialog.setWindowTitle("Select Post Spawn Action")
-            layout = QVBoxLayout(dialog)
-
-            combo_box = QComboBox()
-            combo_box.addItems(self.POST_SPAWN_ACTIONS)
-
-            current_action = item.itemData.get("PostSpawnActions", [""])[0] if item.itemData.get("PostSpawnActions") else ""
-            if current_action in self.POST_SPAWN_ACTIONS:
-                combo_box.setCurrentText(current_action)
-            else:
-                combo_box.setCurrentText("None")
-
-            layout.addWidget(QLabel("Select post spawn action:"))
-            layout.addWidget(combo_box)
-
-            buttons = QDialogButtonBox(
-                QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
-                Qt.Horizontal, dialog)
-            buttons.accepted.connect(dialog.accept)
-            buttons.rejected.connect(dialog.reject)
-            layout.addWidget(buttons)
-
-            if dialog.exec_() == QDialog.Accepted:
-                selected_action = combo_box.currentText()
-                self._change_post_spawn_action(item, selected_action)
-                row = item.row()
-                model_index = self.model.createIndex(row, self.ACTION_COLUMN, item)
-                self.model.dataChanged.emit(model_index, model_index, [Qt.DisplayRole])
-                self._set_modified(True)
 
     def _load_parameters(self):
         parameters = []
