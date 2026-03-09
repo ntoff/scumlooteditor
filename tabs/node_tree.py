@@ -325,13 +325,31 @@ class NodeTreeViewer(QWidget):
             main_window.status_bar.showMessage("New file created", 15000)
 
     def _close_file(self):
-        if not self.current_file:
-            return
+        # Check if there's unsaved work
+        if self._is_modified:
+            reply = QMessageBox.question(
+                self,
+                'Unsaved Changes',
+                'You have unsaved changes. Are you sure you want to close without saving?',
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            if reply == QMessageBox.No:
+                return
 
+        # Clear the model and reset state
         self.model.clear()
         self.tree_view.expandAll()
+        
+        # Reset internal state
         self.current_file = None
+        self._is_modified = False
         self.file_info_label.setText("No file loaded")
+        
+        # Optional: notify user or update main window status
+        main_window = self.window()
+        if hasattr(main_window, 'status_bar'):
+            main_window.status_bar.showMessage("File closed", 1500)
 
     def _load_settings(self):
         settings = self.settings_manager.load_settings('node_editor')
